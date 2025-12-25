@@ -1,4 +1,6 @@
-﻿using System;
+using System;
+using System.IO;
+using System.Collections.Generic;
 using EVESharp.Types;
 using EVESharp.Database;
 using EVESharp.Database.Extensions;
@@ -12,15 +14,19 @@ using EVESharp.EVE.Dogma;
 using EVESharp.EVE.Exceptions;
 using EVESharp.EVE.Exceptions.ship;
 using EVESharp.EVE.Network.Services;
+using EVESharp.Node.Services.Navigation;
 using EVESharp.EVE.Network.Services.Validators;
 using EVESharp.EVE.Notifications;
 using EVESharp.EVE.Notifications.Inventory;
 using EVESharp.EVE.Sessions;
 using EVESharp.Types.Collections;
+using EVESharp.Destiny;
+
 
 namespace EVESharp.Node.Services.Inventory;
 
 [MustBeCharacter]
+[ConcreteService("ship")]
 public class ship : ClientBoundService
 {
     public override AccessLevel AccessLevel => AccessLevel.None;
@@ -32,10 +38,11 @@ public class ship : ClientBoundService
     private IDogmaNotifications DogmaNotifications { get; }
     private IDatabase Database { get; }
     private IDogmaItems DogmaItems { get; }
+    private INotificationSender NotificationSender { get; }
 
     public ship(
         IItems items, IBoundServiceManager manager, ISessionManager sessionManager, IDogmaNotifications dogmaNotifications,
-        IDatabase database, ISolarSystems solarSystems, IDogmaItems dogmaItems
+        IDatabase database, ISolarSystems solarSystems, IDogmaItems dogmaItems, INotificationSender notificationSender
     ) : base(manager)
     {
         Console.WriteLine("[DEBUG] Node.Services.Inventory.ship (global service) constructed");
@@ -45,11 +52,13 @@ public class ship : ClientBoundService
         Database = database;
         SolarSystems = solarSystems;
         DogmaItems = dogmaItems;
+        NotificationSender = notificationSender;
     }
 
     protected ship(
         ItemEntity location, IItems items, IBoundServiceManager manager, ISessionManager sessionManager,
-        IDogmaNotifications dogmaNotifications, Session session, ISolarSystems solarSystems, IDogmaItems dogmaItems
+        IDogmaNotifications dogmaNotifications, Session session, ISolarSystems solarSystems, IDogmaItems dogmaItems,
+        INotificationSender notificationSender
     ) : base(manager, session, location.ID)
     {
         Console.WriteLine("[DEBUG] Node.Services.Inventory.ship (bound instance) constructed for objectID=" + location.ID);
@@ -59,6 +68,7 @@ public class ship : ClientBoundService
         DogmaNotifications = dogmaNotifications;
         SolarSystems = solarSystems;
         DogmaItems = dogmaItems;
+        NotificationSender = notificationSender;
     }
 
     public PyInteger LeaveShip(ServiceCall call)
@@ -66,16 +76,11 @@ public class ship : ClientBoundService
         int callerCharacterID = call.Session.CharacterID;
 
         Character character = this.Items.GetItem<Character>(callerCharacterID);
-        // create a pod for this character
         ItemInventory capsule = DogmaItems.CreateItem<ItemInventory>(
             character.Name + "'s Capsule", Types[TypeID.Capsule], character.ID, Location.ID, Flags.Hangar, 1, true
         );
-        // move the character into the new capsule
         DogmaItems.MoveItem(character, capsule.ID, Flags.Pilot);
-        // notify the client
         SessionManager.PerformSessionUpdate(Session.CHAR_ID, callerCharacterID, new Session { ShipID = capsule.ID });
-
-        // TODO: CHECKS FOR IN-SPACE LEAVING!
 
         return capsule.ID;
     }
@@ -84,8 +89,6 @@ public class ship : ClientBoundService
     {
         int callerCharacterID = call.Session.CharacterID;
 
-        // ensure the item is loaded somewhere in this node
-        // this will usually be taken care by the EVE Client
         if (this.Items.TryGetItem(itemID, out Ship newShip) == false)
             throw new CustomError("Ships not loaded for player and hangar!");
 
@@ -95,15 +98,10 @@ public class ship : ClientBoundService
         if (newShip.Singleton == false)
             throw new CustomError("TooFewSubSystemsToUndock");
 
-        // TODO: CHECKS FOR IN-SPACE BOARDING!
-
-        // check skills required to board the given ship
         newShip.EnsureOwnership(callerCharacterID, call.Session.CorporationID, call.Session.CorporationRole, true);
         newShip.CheckPrerequisites(character);
 
-        // move the character into this new ship
         DogmaItems.MoveItem(character, newShip.ID, Flags.Pilot);
-        // finally update the session
         SessionManager.PerformSessionUpdate(Session.CHAR_ID, callerCharacterID, new Session { ShipID = newShip.ID });
 
         if (currentShip.Type.ID == (int)TypeID.Capsule)
@@ -118,20 +116,16 @@ public class ship : ClientBoundService
         int callerCharacterID = call.Session.CharacterID;
         int stationID = call.Session.StationID;
 
-        // ensure the item is loaded somewhere in this node
         if (this.Items.TryGetItem(itemID, out Ship ship) == false)
             throw new CustomError("Ships not loaded for player and hangar!");
 
         if (ship.OwnerID != callerCharacterID)
             throw new AssembleOwnShipsOnly(ship.OwnerID);
 
-        // do not do anything if item is already assembled
         if (ship.Singleton)
             return new ShipAlreadyAssembled(ship.Type);
 
-        // split the stack first
         ItemEntity split = DogmaItems.SplitStack(ship, 1);
-        // update the singleton
         DogmaItems.SetSingleton(split, true);
 
         return null;
@@ -169,59 +163,101 @@ public class ship : ClientBoundService
         if (location.Type.Group.ID != bindParams.ExtraValue)
             throw new CustomError("Location and group do not match");
 
-        return new ship(location, this.Items, BoundServiceManager, SessionManager, this.DogmaNotifications, call.Session, this.SolarSystems, DogmaItems);
+        return new ship(
+            location,
+            this.Items,
+            BoundServiceManager,
+            SessionManager,
+            this.DogmaNotifications,
+            call.Session,
+            this.SolarSystems,
+            DogmaItems,
+            NotificationSender
+        );
     }
 
-       [MustBeInStation]
-    public PyDataType Undock(ServiceCall call, PyBool ignore = null)
+    /// <summary>
+    /// Undock from station.
+    /// 
+    /// IMPORTANT: This method ONLY performs the session change.
+    /// The DoDestinyUpdate notification is sent by beyonce::GetFormations()
+    /// to ensure proper timing (client must have ballpark ready first).
+    /// </summary>
+    [MustBeInStation]
+    public PyDataType Undock(ServiceCall call, PyBool animate)
     {
-        var session   = call.Session;
+        var session = call.Session;
+        if (session == null)
+            throw new Exception("Undock: No session attached.");
+
         int charID    = session.CharacterID;
+        int shipID    = session.ShipID ?? 0;
         int stationID = session.StationID;
 
-        Console.WriteLine($"[ship] Undock called for characterID={charID} at stationID={stationID}");
+        Console.WriteLine($"[ship] Undock() START: char={charID}, station={stationID}, shipID={shipID}");
 
-        // 1. Determine solar system from station
-        int solarSystemID = this.Items.GetStaticStation(stationID).SolarSystemID;
+        // ----------------------------
+        // 1. STATIC STATION LOOKUP
+        // ----------------------------
+        var station = this.Items.GetStaticStation(stationID);
+        if (station == null)
+            throw new Exception($"Static station {stationID} missing.");
 
-        // 2. Update session to mark player as being in space
-        SessionManager.PerformSessionUpdate(Session.CHAR_ID, charID, new Session
+        int solarSystemID   = station.SolarSystemID;
+        int constellationID = station.ConstellationID;
+        int regionID        = station.RegionID;
+
+        Console.WriteLine($"[ship] Undock: system={solarSystemID}, constellation={constellationID}, region={regionID}");
+
+        // ----------------------------
+        // 2. UPDATE SHIP POSITION
+        // ----------------------------
+        // Set undock position on the ship entity so beyonce can use it
+        if (Items.TryGetItem(shipID, out ItemEntity shipEntity))
         {
-            StationID     = 0,
-            SolarSystemID = solarSystemID
-        });
-
-        Console.WriteLine($"[ship] Updated session -> solarSystemID={solarSystemID}");
-
-        // 3. Create minimal Ballpark object (just player ship)
-        var shipItem = this.Items.GetItem<Ship>((int)session.ShipID);
-
-        var position = new PyList { 0.0, 0.0, 0.0 };
-
-        var entity = new PyDictionary
-        {
-            ["itemID"]   = new PyInteger(shipItem.ID),
-            ["typeID"]   = new PyInteger(shipItem.Type.ID),
-            ["ownerID"]  = new PyInteger(charID),
-            ["position"] = position
-        };
-
-        var entities = new PyTuple(1);
-           entities[0] = entity;
+            double undockX = (double)station.X + 1000.0;
+            double undockY = (double)station.Y + 500.0;
+            double undockZ = (double)station.Z + 1000.0;
 
 
-       var ballpark = new PyDictionary
-        {
-        ["solarsystemID"] = new PyInteger(solarSystemID),
-        ["entities"]      = entities,
-        ["formations"]    = new PyTuple()
-         };
+            // Update ship's coordinates for the undock position
+            shipEntity.X = undockX;
+            shipEntity.Y = undockY;
+            shipEntity.Z = undockZ;
 
+            Console.WriteLine($"[ship] Undock: Set ship position to ({undockX:F0}, {undockY:F0}, {undockZ:F0})");
+        }
 
-        Console.WriteLine($"[ship] Spawned Ballpark in solarSystemID={solarSystemID} for shipID={shipItem.ID}");
+        // ----------------------------
+        // 3. SESSION CHANGE
+        // ----------------------------
+        var delta = new Session();
 
-        return ballpark;
+        delta[Session.STATION_ID]       = new PyNone();
+        delta[Session.LOCATION_ID]      = (PyInteger)solarSystemID;
+        delta[Session.SOLAR_SYSTEM_ID]  = (PyInteger)solarSystemID;
+        delta[Session.SOLAR_SYSTEM_ID2] = (PyInteger)solarSystemID;
+        delta[Session.CONSTELLATION_ID] = (PyInteger)constellationID;
+        delta[Session.REGION_ID]        = (PyInteger)regionID;
+        delta[Session.SHIP_ID]          = (PyInteger)shipID;
+
+        Console.WriteLine("[ship] Undock: Performing session update...");
+        this.SessionManager.PerformSessionUpdate(Session.CHAR_ID, charID, delta);
+        Console.WriteLine("[ship] Undock: Session update completed");
+
+        // ----------------------------
+        // 4. RETURN - NO DoDestinyUpdate HERE!
+        // ----------------------------
+        // The client will:
+        //   1. Receive session change notification
+        //   2. Call AddBallpark() which creates the destiny.Ballpark
+        //   3. Bind to beyonce service
+        //   4. Call beyonce::GetFormations()
+        //   5. beyonce::GetFormations() sends DoDestinyUpdate notification
+        // 
+        // This ordering ensures the client's ballpark is ready to receive the state.
+
+        Console.WriteLine("[ship] Undock() COMPLETE - returning PyNone (beyonce will send state)");
+        return new PyNone();
     }
-
-
 }

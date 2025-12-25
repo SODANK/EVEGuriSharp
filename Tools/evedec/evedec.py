@@ -69,7 +69,7 @@ def process_func(code_q, result_q, decompiled_store_path, compiled_store_path, l
                 # finally decompyle the file
                 #try:
                 #    out_file = open(filename, 'w')
-                #    uncompyle2.uncompyle(2.5, code, out_file)
+                #    uncompyle2.uncompyle(2.7, code, out_file)
                 #    out_file.close()
                 #except:
                 out_file = open(filename, 'w')
@@ -104,7 +104,7 @@ def process_func(code_q, result_q, decompiled_store_path, compiled_store_path, l
 
 
 if __name__ == '__main__':
-    if sys.version[:3] != '2.5':
+    if sys.version[:3] != '2.7':
         print >> sys.stderr, '!!! Wrong Python version : %s.  Python 2.7 required.'
         sys.exit(-1)
 

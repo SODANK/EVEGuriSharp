@@ -15,6 +15,8 @@ using EVESharp.Node.Configuration;
 using EVESharp.Types;
 using EVESharp.Types.Collections;
 using Serilog;
+using EVESharp.Node.Services.Network;
+
 
 namespace EVESharp.Node.Server.Single;
 
@@ -24,18 +26,20 @@ public class MachoNet : IMachoNet
     private IDatabase Database      { get; }
 
     public MachoNet
-    (
-        IDatabase database, ITransportManager transportManager, IQueueProcessor <LoginQueueEntry> loginProcessor,
-        General             configuration,      ILogger           logger
-    )
-    {
-        Database         = database;
-        LoginProcessor   = loginProcessor;
-        TransportManager = transportManager;
-        Configuration    = configuration;
-        Log              = logger;
+(
+    IDatabase database, ITransportManager transportManager, IQueueProcessor<LoginQueueEntry> loginProcessor,
+    General configuration, ILogger logger
+)
+{
+    Database         = database;
+    LoginProcessor   = loginProcessor;
+    TransportManager = transportManager;
+    Configuration    = configuration;
+    Log              = logger;
+
     }
 
+    
     public long                              NodeID           { get; set; } = Network.PROXY_NODE_ID;
     public string                            Address          { get; set; }
     public RunMode                           Mode             => RunMode.Single;
@@ -72,6 +76,9 @@ public class MachoNet : IMachoNet
 
     public void QueueOutputPacket (IMachoTransport origin, PyPacket packet)
     {
+
+        Console.WriteLine($"[QueueOutputPacket] DEST={packet.Destination} TYPE={packet.Type}");
+
         // origin not being null means the packet came from a specific connection
         // and is a direct answer to it, so we can short-circuit through it
         // this can only happen if the destination is a client

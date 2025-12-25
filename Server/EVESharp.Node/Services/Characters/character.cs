@@ -473,6 +473,37 @@ public class character : Service
         // update the session data for this client
         updates.CharacterID   = character.ID;
         updates.CorporationID = character.CorporationID;
+       
+         // -----------------------------------------------------
+        // REQUIRED SESSION INITIALIZATION FOR LSC + MICHELLE + BALLPARK
+        // -----------------------------------------------------
+
+        updates.CharacterID   = character.ID;
+        updates.CorporationID = character.CorporationID;
+
+        // Player is inside a station
+        updates.LocationID  = character.StationID;
+        updates.LocationID2 = character.StationID;
+
+        // Solar system fields (Apoc requires BOTH)
+        updates.SolarSystemID  = character.SolarSystemID;
+        updates.SolarSystemID2 = character.SolarSystemID;
+
+        // Constellation + Region (ONLY ONE field each in EVESharp Apoc)
+        updates.ConstellationID = character.ConstellationID;
+        updates.RegionID        = character.RegionID;
+
+        // Required for everything else
+        updates.StationID = character.StationID;
+
+        Log.Information(
+            $"[character] Session restored: station={character.StationID}, system={character.SolarSystemID}, constellation={character.ConstellationID}, region={character.RegionID}"
+        );
+        
+
+        // Log for sanity
+        Log.Information($"[character] Session location set: station={character.StationID}, system={character.SolarSystemID}");
+
 
         if (character.StationID == 0)
             updates.SolarSystemID = character.SolarSystemID;

@@ -252,7 +252,11 @@ public class Marshal
                 this.ProcessPackedRow (writer, pyPackedRow);
                 break;
 
+
             default:
+             Console.WriteLine(
+            $"[Marshal] UNEXPECTED TYPE: {data.GetType().FullName} " +
+            $"(Value: {data?.ToString() ?? "null"})");
                 throw new InvalidDataException ($"Unexpected type {data.GetType ()}");
         }
     }

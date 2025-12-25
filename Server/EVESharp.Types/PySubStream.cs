@@ -1,3 +1,4 @@
+using System; 
 using EVESharp.Common.Checksum;
 using EVESharp.Types.Serialization;
 
@@ -13,35 +14,47 @@ public class PySubStream : PyDataType
     public PyDataType Stream
     {
         get
+{
+    if (!this.mIsUnmarshaled)
+    {
+        try
         {
-            if (this.mIsUnmarshaled == false)
-                this.mOriginalStream = this.mCurrentStream = Unmarshal.ReadFromByteArray (this.mByteStream);
-
-            return this.mCurrentStream;
+            this.mOriginalStream = this.mCurrentStream =
+                Unmarshal.ReadFromByteArray(this.mByteStream);
         }
-
-        set
+        catch (Exception ex)
         {
-            this.mIsUnmarshaled = true;
-            this.mCurrentStream = value;
+            Console.WriteLine("[PySubStream] Unmarshal failed, substituting PyNone: " + ex);
+            this.mOriginalStream = this.mCurrentStream = new PyNone();
         }
     }
 
-    public byte [] ByteStream
+    return this.mCurrentStream;
+}
+
+    }
+
+    public byte[] ByteStream
+{
+    get
     {
-        get
+        try
         {
-            // check hash codes and types to ensure they're equal
-            if (this.mByteStream is not null && (this.mIsUnmarshaled == false || this.mCurrentStream == this.mOriginalStream))
+            if (this.mByteStream != null &&
+                (this.mIsUnmarshaled == false || this.mCurrentStream == this.mOriginalStream))
                 return this.mByteStream;
 
-            // make sure the old and new value are the same so checks work fine
             this.mOriginalStream = this.mCurrentStream;
-
-            // update the byte stream with the new value
-            return this.mByteStream = Marshal.ToByteArray (this.mCurrentStream);
+            return this.mByteStream = Marshal.ToByteArray(this.mCurrentStream);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[PySubStream] ByteStream generation FAILED, substituting empty stream: " + ex);
+            return Array.Empty<byte>();
         }
     }
+}
+
 
     public PySubStream (byte [] from)
     {

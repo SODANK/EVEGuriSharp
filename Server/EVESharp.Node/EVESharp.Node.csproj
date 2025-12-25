@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -21,6 +21,7 @@
     <ItemGroup>
         <ProjectReference Include="..\EVESharp.Common\EVESharp.Common.csproj" />
         <ProjectReference Include="..\EVESharp.Database\EVESharp.Database.csproj" />
+        <ProjectReference Include="..\EVESharp.Destiny\EVESharp.Destiny.csproj" />
         <ProjectReference Include="..\EVESharp.EVE\EVESharp.EVE.csproj" />
         <ProjectReference Include="..\EVESharp.Types\EVESharp.Types.csproj" />
     </ItemGroup>

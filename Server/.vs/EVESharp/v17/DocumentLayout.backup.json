@@ -1,0 +1,358 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\inventory\\ship.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\inventory\\ship.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\beyonce.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\beyonce.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\ballparksvc.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\ballparksvc.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\characters\\character.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\characters\\character.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\michelle.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\michelle.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\stations\\stationsvc.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\stations\\stationsvc.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0CA562B7-141F-40DC-A408-B0BACE964169}|EVESharp.Destiny\\EVESharp.Destiny.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.destiny\\destinybinaryencoder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0CA562B7-141F-40DC-A408-B0BACE964169}|EVESharp.Destiny\\EVESharp.Destiny.csproj|solutionrelative:evesharp.destiny\\destinybinaryencoder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\destinyballbuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\destinyballbuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\spaceserviceregistrar.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\spaceserviceregistrar.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\sessions\\sessionmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\sessions\\sessionmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\server\\node\\messages\\messagequeue.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\server\\node\\messages\\messagequeue.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE9DA21C-748B-42C1-B268-349B475FB250}|EVESharp.EVE\\EVESharp.EVE.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.eve\\packets\\sessionchangenotification.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{EE9DA21C-748B-42C1-B268-349B475FB250}|EVESharp.EVE\\EVESharp.EVE.csproj|solutionrelative:evesharp.eve\\packets\\sessionchangenotification.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8E8A9A83-05F8-4744-A3CE-7AECBBAE6754}|EVESharp.Types\\EVESharp.Types.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.types\\serialization\\marshal.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8E8A9A83-05F8-4744-A3CE-7AECBBAE6754}|EVESharp.Types\\EVESharp.Types.csproj|solutionrelative:evesharp.types\\serialization\\marshal.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\network\\sessionchangegpcs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\network\\sessionchangegpcs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\server\\single\\machonet.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\server\\single\\machonet.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE9DA21C-748B-42C1-B268-349B475FB250}|EVESharp.EVE\\EVESharp.EVE.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.eve\\sessions\\sessionmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{EE9DA21C-748B-42C1-B268-349B475FB250}|EVESharp.EVE\\EVESharp.EVE.csproj|solutionrelative:evesharp.eve\\sessions\\sessionmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\network\\gpcschannel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\network\\gpcschannel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\ballpark.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\ballpark.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\boundservicemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\boundservicemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DA7A3801-9E1C-4D6A-A59E-8F9F5704B3E5}|EVESharp.Types.Unit\\EVESharp.Types.Unit.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.types.unit\\types\\primitives\\pysubstreamtests.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DA7A3801-9E1C-4D6A-A59E-8F9F5704B3E5}|EVESharp.Types.Unit\\EVESharp.Types.Unit.csproj|solutionrelative:evesharp.types.unit\\types\\primitives\\pysubstreamtests.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "beyonce.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\beyonce.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\beyonce.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\beyonce.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Space\\beyonce.cs",
+              "ViewState": "AgIAAKABAAAAAAAAAAAgwKgBAABGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-08T13:19:27.273Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Program.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Program.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Program.cs",
+              "RelativeToolTip": "EVESharp.Node\\Program.cs",
+              "ViewState": "AgIAAMcAAAAAAAAAAAAgwNQAAAAfAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-08T09:01:44.667Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ship.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Inventory\\ship.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Inventory\\ship.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Inventory\\ship.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Inventory\\ship.cs",
+              "ViewState": "AgIAAM4AAAAAAAAAAAAgwNsAAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-08T08:52:37.452Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "character.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Characters\\character.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Characters\\character.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Characters\\character.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Characters\\character.cs",
+              "ViewState": "AgIAAOcBAAAAAAAAAAAQwO0BAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-02T23:34:24.192Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "DestinyBallbuilder.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
+              "ViewState": "AgIAAAwAAAAAAAAAAAArwBQAAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-02T21:48:35.216Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "DestinyBinaryEncoder.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Destiny\\DestinyBinaryEncoder.cs",
+              "RelativeDocumentMoniker": "EVESharp.Destiny\\DestinyBinaryEncoder.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Destiny\\DestinyBinaryEncoder.cs",
+              "RelativeToolTip": "EVESharp.Destiny\\DestinyBinaryEncoder.cs",
+              "ViewState": "AgIAANEAAAAAAAAAAAArwNoAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-02T21:48:09.297Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "michelle.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\michelle.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\michelle.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\michelle.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Space\\michelle.cs",
+              "ViewState": "AgIAAE8AAAAAAAAAAAAAAFQAAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-26T00:07:08.259Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ballparkSvc.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\ballparkSvc.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\ballparkSvc.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\ballparkSvc.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Space\\ballparkSvc.cs",
+              "ViewState": "AgIAALIBAAAAAAAAAAAgwL8BAAAcAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-22T15:19:35.003Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "stationSvc.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Stations\\stationSvc.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Stations\\stationSvc.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Stations\\stationSvc.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Stations\\stationSvc.cs",
+              "ViewState": "AgIAACQAAAAAAAAAAAAnwDEAAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-22T17:48:39.998Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "SessionManager.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Sessions\\SessionManager.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Sessions\\SessionManager.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Sessions\\SessionManager.cs",
+              "RelativeToolTip": "EVESharp.Node\\Sessions\\SessionManager.cs",
+              "ViewState": "AgIAAFYAAAAAAAAAAAArwF0AAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-25T15:12:12.687Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "SessionChangeNotification.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.EVE\\Packets\\SessionChangeNotification.cs",
+              "RelativeDocumentMoniker": "EVESharp.EVE\\Packets\\SessionChangeNotification.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.EVE\\Packets\\SessionChangeNotification.cs",
+              "RelativeToolTip": "EVESharp.EVE\\Packets\\SessionChangeNotification.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-26T12:36:56.949Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "MessageQueue.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Server\\Node\\Messages\\MessageQueue.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Server\\Node\\Messages\\MessageQueue.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Server\\Node\\Messages\\MessageQueue.cs",
+              "RelativeToolTip": "EVESharp.Node\\Server\\Node\\Messages\\MessageQueue.cs",
+              "ViewState": "AgIAAC8AAAAAAAAAAAArwDcAAAAXAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-26T22:25:26.104Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "Marshal.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Types\\Serialization\\Marshal.cs",
+              "RelativeDocumentMoniker": "EVESharp.Types\\Serialization\\Marshal.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Types\\Serialization\\Marshal.cs",
+              "RelativeToolTip": "EVESharp.Types\\Serialization\\Marshal.cs",
+              "ViewState": "AgIAAPYAAAAAAAAAAAArwP4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-22T04:27:19.552Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "SpaceServiceRegistrar.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\SpaceServiceRegistrar.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\SpaceServiceRegistrar.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\SpaceServiceRegistrar.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Space\\SpaceServiceRegistrar.cs",
+              "ViewState": "AgIAACMAAAAAAAAAAAAYwCwAAAAzAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-23T04:40:59.328Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "MachoNet.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Server\\Single\\MachoNet.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Server\\Single\\MachoNet.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Server\\Single\\MachoNet.cs",
+              "RelativeToolTip": "EVESharp.Node\\Server\\Single\\MachoNet.cs",
+              "ViewState": "AgIAAB8AAAAAAAAAAAAewCUAAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-27T23:52:22.549Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "SessionManager.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.EVE\\Sessions\\SessionManager.cs",
+              "RelativeDocumentMoniker": "EVESharp.EVE\\Sessions\\SessionManager.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.EVE\\Sessions\\SessionManager.cs",
+              "RelativeToolTip": "EVESharp.EVE\\Sessions\\SessionManager.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-28T12:45:26.919Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "GPCSChannel.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Network\\GPCSChannel.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Network\\GPCSChannel.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Network\\GPCSChannel.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Network\\GPCSChannel.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACQAAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-28T12:45:54.496Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "SessionChangeGPCS.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Network\\SessionChangeGPCS.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Network\\SessionChangeGPCS.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Network\\SessionChangeGPCS.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Network\\SessionChangeGPCS.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAABMAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-28T12:54:44.101Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "BoundServiceManager.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\BoundServiceManager.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\BoundServiceManager.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\BoundServiceManager.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\BoundServiceManager.cs",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAqwBMAAAAjAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-23T04:17:19.271Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "Ballpark.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\Ballpark.cs",
+              "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\Ballpark.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\Ballpark.cs",
+              "RelativeToolTip": "EVESharp.Node\\Services\\Space\\Ballpark.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-22T15:47:46.306Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 20,
+              "Title": "PySubStreamTests.cs",
+              "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Types.Unit\\Types\\Primitives\\PySubStreamTests.cs",
+              "RelativeDocumentMoniker": "EVESharp.Types.Unit\\Types\\Primitives\\PySubStreamTests.cs",
+              "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Types.Unit\\Types\\Primitives\\PySubStreamTests.cs",
+              "RelativeToolTip": "EVESharp.Types.Unit\\Types\\Primitives\\PySubStreamTests.cs",
+              "ViewState": "AgIAABwAAAAAAAAAAAAAACMAAAA6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-22T05:32:26.942Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

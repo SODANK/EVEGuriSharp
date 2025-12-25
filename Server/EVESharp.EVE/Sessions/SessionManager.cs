@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using EVESharp.Types;
 
+
 namespace EVESharp.EVE.Sessions;
 
 /// <summary>

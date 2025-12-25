@@ -1,11 +1,13 @@
-﻿using System;
+using System;
 using EVESharp.EVE.Data.Inventory;
+using EVESharp.EVE.Data.Inventory.Items;
 using EVESharp.EVE.Network.Caching;
 using EVESharp.EVE.Network.Services;
 using EVESharp.EVE.Network.Services.Validators;
 using EVESharp.EVE.Packets.Complex;
 using EVESharp.Node.Cache;
 using EVESharp.Types;
+
 
 namespace EVESharp.Node.Services.Stations
 {
@@ -40,11 +42,8 @@ namespace EVESharp.Node.Services.Stations
             return this.Items.SolarSystems[solarSystemID].GetSolarSystemInfo();
         }
 
-        [MustBeInStation]
-        public PyString Undock(ServiceCall call)
-        {
-            Console.WriteLine($"[stationSvc] Undock called for characterID={call.Session.CharacterID} at stationID={call.Session.StationID}");
-            return new PyString("Undock acknowledged (stub)");
-        }
+        
+
+
     }
 }
