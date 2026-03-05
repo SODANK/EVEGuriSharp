@@ -164,16 +164,21 @@ namespace EVESharp.Node.Services.Space
         {
             var d = new PyDictionary
             {
-                ["itemID"]     = new PyInteger(ent.ItemID),
-                ["typeID"]     = new PyInteger(ent.TypeID),
-                ["groupID"]    = new PyInteger(ent.GroupID),
-                ["ownerID"]    = new PyInteger(ent.OwnerID),
-                ["locationID"] = new PyInteger(solarSystemID),
-                ["categoryID"] = new PyInteger(ent.CategoryID),
-                ["name"]       = new PyString(ent.Name ?? "Unknown"),
-                ["corpID"]     = new PyInteger(ent.CorporationID),
-                ["allianceID"] = new PyInteger(ent.AllianceID),
-                ["charID"]     = new PyInteger(ent.CharacterID)
+                ["itemID"]          = new PyInteger(ent.ItemID),
+                ["typeID"]          = new PyInteger(ent.TypeID),
+                ["groupID"]         = new PyInteger(ent.GroupID),
+                ["ownerID"]         = new PyInteger(ent.OwnerID),
+                ["locationID"]      = new PyInteger(solarSystemID),
+                ["categoryID"]      = new PyInteger(ent.CategoryID),
+                ["name"]            = new PyString(ent.Name ?? "Unknown"),
+                ["corpID"]          = new PyInteger(ent.CorporationID),
+                ["allianceID"]      = new PyInteger(ent.AllianceID),
+                ["charID"]          = new PyInteger(ent.CharacterID),
+                ["dunObjectID"]     = new PyNone(),
+                ["jumps"]           = new PyList(),
+                ["securityStatus"]  = new PyDecimal(0.0),
+                ["orbitalVelocity"] = new PyDecimal(0.0),
+                ["warFactionID"]    = new PyNone()
             };
 
             return new PyObjectData("util.KeyVal", d);

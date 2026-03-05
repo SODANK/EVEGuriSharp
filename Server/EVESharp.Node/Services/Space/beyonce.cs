@@ -5,6 +5,7 @@ using EVESharp.Database.Types;
 using EVESharp.Destiny;
 using EVESharp.EVE.Data.Inventory;
 using EVESharp.EVE.Data.Inventory.Items;
+using EVESharp.EVE.Data.Inventory.Items.Types;
 using EVESharp.EVE.Network.Services;
 using EVESharp.EVE.Notifications;
 using EVESharp.EVE.Sessions;
@@ -129,6 +130,24 @@ namespace EVESharp.Node.Services.Space
                 {
                     var stationBubble = CreateBubbleEntity(stationEntity, session, false);
                     mDestinyManager.RegisterEntity(stationBubble);
+                }
+
+                // Set undock velocity on the ship so it launches out of the dock
+                if (stationEntity is Station stationItem && mDestinyManager.TryGetEntity(shipID, out var shipBubble))
+                {
+                    var stationType = stationItem.StationType;
+                    double undockSpeed = shipBubble.MaxVelocity;
+
+                    shipBubble.Velocity = new Vector3
+                    {
+                        X = stationType.DockOrientationX * undockSpeed,
+                        Y = stationType.DockOrientationY * undockSpeed,
+                        Z = stationType.DockOrientationZ * undockSpeed
+                    };
+                    shipBubble.SpeedFraction = 1.0;
+
+                    Log.Information("[beyonce] Set undock velocity ({VelX:F0},{VelY:F0},{VelZ:F0}) speed={Speed:F0}",
+                        shipBubble.Velocity.X, shipBubble.Velocity.Y, shipBubble.Velocity.Z, undockSpeed);
                 }
             }
 
@@ -284,7 +303,6 @@ namespace EVESharp.Node.Services.Space
             int shipID = call.Session.ShipID ?? 0;
             Log.Information("[beyonce] WarpToStuff: ship={ShipID}, type={WarpType}, item={ItemID}", shipID, type?.Value, itemID?.Value);
 
-            // Look up the target entity's position and warp there
             int targetID = (int)(itemID?.Value ?? 0);
             if (targetID != 0 && Items.TryGetItem(targetID, out ItemEntity target))
             {
@@ -519,7 +537,7 @@ namespace EVESharp.Node.Services.Space
                 }
                 else
                 {
-                    flags = BallFlag.IsGlobal | BallFlag.IsMassive;
+                    flags = BallFlag.IsGlobal | BallFlag.IsMassive | BallFlag.IsInteractive;
                     mode  = BallMode.Rigid;
                 }
 
@@ -543,7 +561,7 @@ namespace EVESharp.Node.Services.Space
                     ball.ExtraHeader = new ExtraBallHeader
                     {
                         Mass          = 1000000.0,
-                        CloakMode     = CloakMode.Normal,
+                        CloakMode     = CloakMode.None,
                         Harmonic      = 0xFFFFFFFFFFFFFFFF,
                         CorporationId = isEgo ? sess.CorporationID : 0,
                         AllianceId    = 0
@@ -595,7 +613,7 @@ namespace EVESharp.Node.Services.Space
             }
             else
             {
-                flags = BallFlag.IsGlobal | BallFlag.IsMassive;
+                flags = BallFlag.IsGlobal | BallFlag.IsMassive | BallFlag.IsInteractive;
                 mode  = BallMode.Rigid;
             }
 
@@ -640,6 +658,8 @@ namespace EVESharp.Node.Services.Space
                 var solarSystem = Items.GetStaticSolarSystem(solarSystemID);
                 var allItems = Items.LoadAllItemsLocatedAt(solarSystem);
 
+                Log.Information("[beyonce] LoadCelestials: {TotalItems} total items found in solar system {SystemID}", allItems.Count, solarSystemID);
+
                 int count = 0;
                 foreach (var kvp in allItems)
                 {
@@ -653,6 +673,17 @@ namespace EVESharp.Node.Services.Space
                     if (mBallpark.Entities.ContainsKey(ent.ID))
                         continue;
 
+                    double radius = ent.Type?.Radius ?? 5000.0;
+                    int typeID = ent.Type?.ID ?? 0;
+                    string groupName = ent.Type?.Group?.Name ?? "???";
+
+                    Log.Information(
+                        "[beyonce]   Celestial: itemID={ItemID} typeID={TypeID} group={GroupName}({GroupID}) " +
+                        "name=\"{Name}\" radius={Radius:F0}m pos=({X:F0}, {Y:F0}, {Z:F0})",
+                        ent.ID, typeID, groupName, groupID,
+                        ent.Name ?? ent.Type?.Name ?? "Unknown",
+                        radius, ent.X ?? 0, ent.Y ?? 0, ent.Z ?? 0);
+
                     mBallpark.AddEntity(ent);
 
                     if (!mDestinyManager.TryGetEntity(ent.ID, out _))
@@ -660,7 +691,7 @@ namespace EVESharp.Node.Services.Space
                         var bubble = new BubbleEntity
                         {
                             ItemID        = ent.ID,
-                            TypeID        = ent.Type?.ID ?? 0,
+                            TypeID        = typeID,
                             GroupID       = groupID,
                             CategoryID    = ent.Type?.Group?.Category?.ID ?? 0,
                             Name          = ent.Name ?? ent.Type?.Name ?? "Unknown",
@@ -671,8 +702,8 @@ namespace EVESharp.Node.Services.Space
                             Position      = new Vector3 { X = ent.X ?? 0, Y = ent.Y ?? 0, Z = ent.Z ?? 0 },
                             Velocity      = default,
                             Mode          = BallMode.Rigid,
-                            Flags         = BallFlag.IsGlobal | BallFlag.IsMassive,
-                            Radius        = ent.Type?.Radius ?? 5000.0,
+                            Flags         = BallFlag.IsGlobal | BallFlag.IsMassive | BallFlag.IsInteractive,
+                            Radius        = radius,
                             Mass          = 1000000.0,
                             MaxVelocity   = 0.0,
                             SpeedFraction = 0.0,
@@ -732,19 +763,24 @@ namespace EVESharp.Node.Services.Space
         {
             var d = new PyDictionary
             {
-                ["itemID"]     = new PyInteger(solID),
-                ["typeID"]     = new PyInteger(5),
-                ["groupID"]    = new PyInteger(5),
-                ["ownerID"]    = new PyInteger(1),
-                ["locationID"] = new PyInteger(0),
-                ["x"]          = new PyInteger(0),
-                ["y"]          = new PyInteger(0),
-                ["z"]          = new PyInteger(0),
-                ["categoryID"] = new PyInteger(2),
-                ["name"]       = new PyString("Solar System"),
-                ["corpID"]     = new PyInteger(0),
-                ["allianceID"] = new PyInteger(0),
-                ["charID"]     = new PyInteger(0)
+                ["itemID"]          = new PyInteger(solID),
+                ["typeID"]          = new PyInteger(5),
+                ["groupID"]         = new PyInteger(5),
+                ["ownerID"]         = new PyInteger(1),
+                ["locationID"]      = new PyInteger(0),
+                ["x"]               = new PyInteger(0),
+                ["y"]               = new PyInteger(0),
+                ["z"]               = new PyInteger(0),
+                ["categoryID"]      = new PyInteger(2),
+                ["name"]            = new PyString("Solar System"),
+                ["corpID"]          = new PyInteger(0),
+                ["allianceID"]      = new PyInteger(0),
+                ["charID"]          = new PyInteger(0),
+                ["dunObjectID"]     = new PyNone(),
+                ["jumps"]           = new PyList(),
+                ["securityStatus"]  = new PyDecimal(0.0),
+                ["orbitalVelocity"] = new PyDecimal(0.0),
+                ["warFactionID"]    = new PyNone()
             };
 
             return new PyObjectData("util.KeyVal", d);
@@ -756,16 +792,21 @@ namespace EVESharp.Node.Services.Space
         {
             var d = new PyDictionary
             {
-                ["itemID"]     = new PyInteger(itemID),
-                ["typeID"]     = new PyInteger(typeID),
-                ["groupID"]    = new PyInteger(groupID),
-                ["ownerID"]    = new PyInteger(ownerID),
-                ["locationID"] = new PyInteger(locationID),
-                ["categoryID"] = new PyInteger(categoryID),
-                ["name"]       = new PyString(name),
-                ["corpID"]     = new PyInteger(corpID),
-                ["allianceID"] = new PyInteger(allianceID),
-                ["charID"]     = new PyInteger(charID)
+                ["itemID"]          = new PyInteger(itemID),
+                ["typeID"]          = new PyInteger(typeID),
+                ["groupID"]         = new PyInteger(groupID),
+                ["ownerID"]         = new PyInteger(ownerID),
+                ["locationID"]      = new PyInteger(locationID),
+                ["categoryID"]      = new PyInteger(categoryID),
+                ["name"]            = new PyString(name),
+                ["corpID"]          = new PyInteger(corpID),
+                ["allianceID"]      = new PyInteger(allianceID),
+                ["charID"]          = new PyInteger(charID),
+                ["dunObjectID"]     = new PyNone(),
+                ["jumps"]           = new PyList(),
+                ["securityStatus"]  = new PyDecimal(0.0),
+                ["orbitalVelocity"] = new PyDecimal(0.0),
+                ["warFactionID"]    = new PyNone()
             };
 
             return new PyObjectData("util.KeyVal", d);

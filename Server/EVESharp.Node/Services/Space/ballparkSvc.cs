@@ -285,7 +285,7 @@ namespace EVESharp.Node.Services.Space
             var extra = new ExtraBallHeader
             {
                 Mass          = 1.0,
-                CloakMode     = CloakMode.Normal,
+                CloakMode     = CloakMode.None,
                 Harmonic      = 0xFFFFFFFFFFFFFFFF,
                 CorporationId = 0,
                 AllianceId    = 0

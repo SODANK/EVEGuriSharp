@@ -30,10 +30,10 @@ namespace EVESharp.Node.Services.Space
             // -------------------------------------------------------
             // All balls should have at least IsMassive flag
             // Ego (player ship) also needs IsFree and IsInteractive
-            BallFlag flags = BallFlag.IsMassive;
+            BallFlag flags = BallFlag.IsMassive | BallFlag.IsInteractive;
             if (isEgo)
             {
-                flags |= BallFlag.IsFree | BallFlag.IsInteractive;
+                flags |= BallFlag.IsFree;
             }
 
             BallHeader header = new BallHeader
@@ -52,7 +52,7 @@ namespace EVESharp.Node.Services.Space
             ExtraBallHeader extra = new ExtraBallHeader
             {
                 Mass          = 1.0,
-                CloakMode     = CloakMode.Normal,
+                CloakMode     = CloakMode.None,
                 Harmonic      = 0xFFFFFFFFFFFFFFFF,
                 CorporationId = 0,
                 AllianceId    = 0
@@ -120,7 +120,7 @@ namespace EVESharp.Node.Services.Space
                 Mode     = BallMode.Rigid,  // Stations are rigid - no movement
                 Radius   = 5000.0,          // Station radius
                 Location = new Vector3 { X = x, Y = y, Z = z },
-                Flags    = BallFlag.IsGlobal | BallFlag.IsMassive
+                Flags    = BallFlag.IsGlobal | BallFlag.IsMassive | BallFlag.IsInteractive
             };
 
             // Rigid balls don't need ExtraHeader or BallData

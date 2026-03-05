@@ -68,7 +68,7 @@ namespace EVESharp.Destiny
                 ball.ExtraHeader = new ExtraBallHeader
                 {
                     Mass          = Mass,
-                    CloakMode     = CloakMode.Normal,
+                    CloakMode     = CloakMode.None,
                     Harmonic      = 0xFFFFFFFFFFFFFFFF,
                     CorporationId = CorporationID,
                     AllianceId    = AllianceID

@@ -77,6 +77,15 @@ public class dogmaIM : ClientBoundService
 
         ship.EnsureOwnership (callerCharacterID, call.Session.CorporationID, call.Session.CorporationRole, true);
 
+        // Ensure shieldCharge is set to shieldCapacity if not already present.
+        // Unlike armor (armorDamage defaults to 0 = full) and structure (damage defaults to 0 = full),
+        // shields use shieldCharge which defaults to 0 = EMPTY. We must initialize it.
+        if (!ship.Attributes.TryGetAttribute (AttributeTypes.shieldCharge, out _))
+        {
+            double shieldCap = ship.Attributes [AttributeTypes.shieldCapacity];
+            ship.Attributes [AttributeTypes.shieldCharge] = new EVESharp.Database.Inventory.Attributes.Attribute (AttributeTypes.shieldCharge, shieldCap);
+        }
+
         ItemInfo itemInfo = new ItemInfo ();
         itemInfo.AddRow (ship.ID, ship.GetEntityRow (), ship.GetEffects (), ship.Attributes, DateTime.UtcNow.ToFileTime ());
 

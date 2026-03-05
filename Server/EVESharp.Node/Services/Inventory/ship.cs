@@ -218,20 +218,21 @@ public class ship : ClientBoundService
         // ----------------------------
         // 2. UPDATE SHIP POSITION
         // ----------------------------
-        // Set undock position on the ship entity so beyonce can use it
+        // Set undock position using the station type's dock entry point + orientation push
         if (Items.TryGetItem(shipID, out ItemEntity shipEntity))
         {
-            double undockX = (double)station.X + 1000.0;
-            double undockY = (double)station.Y + 500.0;
-            double undockZ = (double)station.Z + 1000.0;
+            var stationType = station.StationType;
+            double pushDistance = 500.0; // meters along dock orientation to clear the station hull
 
+            double undockX = (double)station.X + stationType.DockEntryX + stationType.DockOrientationX * pushDistance;
+            double undockY = (double)station.Y + stationType.DockEntryY + stationType.DockOrientationY * pushDistance;
+            double undockZ = (double)station.Z + stationType.DockEntryZ + stationType.DockOrientationZ * pushDistance;
 
-            // Update ship's coordinates for the undock position
             shipEntity.X = undockX;
             shipEntity.Y = undockY;
             shipEntity.Z = undockZ;
 
-            Log.Information("[ship] Undock: Set ship position to ({X:F0}, {Y:F0}, {Z:F0})", undockX, undockY, undockZ);
+            Log.Information("[ship] Undock: Set ship position to ({X:F0}, {Y:F0}, {Z:F0}) [dock entry + orientation push]", undockX, undockY, undockZ);
         }
 
         // ----------------------------

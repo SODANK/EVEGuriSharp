@@ -13,11 +13,12 @@ namespace EVESharp.Node.Services.Space
     public class DestinyManager : IDisposable
     {
         // EVE physics constants
-        private const double TIC_DURATION   = 1.0;   // seconds per tick
-        private const double SPACE_FRICTION = 1.0e6;
-        private const double AU_IN_METERS   = 1.496e11;
-        private const double WARP_SPEED     = 3.0 * AU_IN_METERS; // 3 AU/s simplified
-        private const double ARRIVE_DIST    = 15000.0; // stop distance for goto/follow
+        private const double TIC_DURATION    = 1.0;   // seconds per tick
+        private const double SPACE_FRICTION  = 1.0e6;
+        private const double AU_IN_METERS    = 1.496e11;
+        private const double WARP_SPEED_AUS  = 3.0;                        // AU/s - sent to client
+        private const double WARP_SPEED      = WARP_SPEED_AUS * AU_IN_METERS; // m/s - server physics
+        private const double ARRIVE_DIST     = 15000.0; // stop distance for goto/follow
         private const double ORBIT_TOLERANCE = 500.0;
 
         public int SolarSystemID { get; }
@@ -190,12 +191,19 @@ namespace EVESharp.Node.Services.Space
                 ent.Mode            = BallMode.Warp;
                 ent.WarpTarget      = new Vector3 { X = x, Y = y, Z = z };
                 ent.WarpEffectStamp = stamp;
-                ent.SpeedFraction   = 1.0f;
+                ent.SpeedFraction   = 1.0;
 
                 var bubble = BubbleManager.GetBubbleForEntity(shipID);
                 if (bubble != null)
                 {
-                    var events = DestinyEventBuilder.BuildWarpTo(shipID, x, y, z, WARP_SPEED, stamp);
+                    // Send GotoPoint first (starts alignment + acceleration toward destination),
+                    // then WarpTo (engages warp once the ball reaches 75% max velocity while aligned).
+                    // The client's native destiny code requires the ball to be in motion for warp to commit.
+                    var events = DestinyEventBuilder.BuildGotoPoint(shipID, x, y, z);
+                    var warpEvents = DestinyEventBuilder.BuildWarpTo(shipID, x, y, z, WARP_SPEED_AUS, stamp);
+                    for (int i = 0; i < warpEvents.Count; i++)
+                        events.Add(warpEvents[i]);
+
                     mBroadcaster.BroadcastToSystem(SolarSystemID, events);
                 }
 
