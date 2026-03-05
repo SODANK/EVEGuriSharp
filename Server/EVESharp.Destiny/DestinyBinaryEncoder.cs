@@ -6,11 +6,8 @@ using System.Runtime.InteropServices;
 namespace EVESharp.Destiny
 {
     /// <summary>
-    /// Builds Destiny binary packets (the same format UpdateReader can parse)
-    /// so they can be sent to the client inside the ballpark snapshot or
-    /// in incremental updates.
-    /// 
-    /// FIXED VERSION: Uses explicit field writing to avoid struct layout issues
+    /// Builds Destiny binary packets in Apocrypha format.
+    /// Field order and types match EVEmu Apocrypha DestinyStructs.h.
     /// </summary>
     public static class DestinyBinaryEncoder
     {
@@ -67,7 +64,7 @@ namespace EVESharp.Destiny
         }
 
         // =====================================================================
-        // Explicit field writing (avoids struct layout ambiguity)
+        // Explicit field writing - Apocrypha format
         // =====================================================================
 
         private static void WriteBallExplicit(BinaryWriter writer, Ball ball)
@@ -78,43 +75,49 @@ namespace EVESharp.Destiny
             var h = ball.Header;
 
             // -------------------------
-            // BallHeader (explicit order must match UpdateReader)
+            // BallHeader (Apocrypha order: entityID, mode, radius, xyz, sub_type)
+            // 38 bytes total
             // -------------------------
-            writer.Write((byte)h.Flags);           // BallFlag : byte
-            writer.Write(h.ItemId);                // long (8 bytes)
-            WriteVector3(writer, h.Location);       // 24 bytes (3 doubles)
+            writer.Write(h.ItemId);                // int (4 bytes)
             writer.Write((byte)h.Mode);            // BallMode : byte
-            writer.Write(h.Radius);                // float (4 bytes)
+            writer.Write(h.Radius);                // double (8 bytes - Apocrypha!)
+            WriteVector3(writer, h.Location);       // 24 bytes (3 doubles)
+            writer.Write((byte)h.Flags);           // BallFlag : byte (sub_type)
 
-            Console.WriteLine($"[DestinyEncoder]   Ball {h.ItemId}: Flags={h.Flags}, Mode={h.Mode}, Pos=({h.Location.X:F0},{h.Location.Y:F0},{h.Location.Z:F0}), R={h.Radius}");
+            Console.WriteLine($"[DestinyEncoder]   Ball {h.ItemId}: Mode={h.Mode}, Flags={h.Flags}, Pos=({h.Location.X:F0},{h.Location.Y:F0},{h.Location.Z:F0}), R={h.Radius}");
 
             // -------------------------
-            // ExtraBallHeader (if mode != Rigid)
+            // ExtraBallHeader / MassSector (if mode != Rigid)
+            // Apocrypha order: mass, cloak, unknown52, corpID, allianceID
+            // 25 bytes total
             // -------------------------
             if (h.Mode != BallMode.Rigid)
             {
                 var extra = ball.ExtraHeader ?? new ExtraBallHeader();
-                writer.Write(extra.AllianceId);        // long (8 bytes)
+                writer.Write(extra.Mass);              // double (8 bytes) - FIRST in Apocrypha
                 writer.Write((byte)extra.CloakMode);   // CloakMode : byte
+                writer.Write(extra.Harmonic);          // ulong (8 bytes) - "unknown52"
                 writer.Write(extra.CorporationId);     // int (4 bytes)
-                writer.Write(extra.Harmonic);          // float (4 bytes)
-                writer.Write(extra.Mass);              // double (8 bytes)
+                writer.Write(extra.AllianceId);        // int (4 bytes)
 
-                Console.WriteLine($"[DestinyEncoder]     ExtraHeader: alliance={extra.AllianceId}, corp={extra.CorporationId}, cloak={extra.CloakMode}");
+                Console.WriteLine($"[DestinyEncoder]     ExtraHeader: mass={extra.Mass}, cloak={extra.CloakMode}, corp={extra.CorporationId}, alliance={extra.AllianceId}");
             }
 
             // -------------------------
-            // BallData (if IsFree flag is set)
+            // BallData / ShipSector (if IsFree flag is set)
+            // Apocrypha order: max_speed, vel xyz, unk xyz, agility, speed_fraction
+            // 72 bytes total
             // -------------------------
             if (h.Flags.HasFlag(BallFlag.IsFree))
             {
                 var data = ball.Data ?? new BallData();
-                writer.Write(data.MaxVelocity);        // float
-                writer.Write(data.SpeedFraction);      // float
-                writer.Write(data.Unk03);              // float
-                WriteVector3(writer, data.Velocity);    // 24 bytes
+                writer.Write(data.MaxVelocity);        // double (8 bytes)
+                WriteVector3(writer, data.Velocity);    // 24 bytes (3 doubles)
+                WriteVector3(writer, data.UnknownVec);  // 24 bytes (3 doubles) - NEW
+                writer.Write(data.Agility);            // double (8 bytes) - NEW
+                writer.Write(data.SpeedFraction);      // double (8 bytes)
 
-                Console.WriteLine($"[DestinyEncoder]     BallData: maxVel={data.MaxVelocity}, speedFrac={data.SpeedFraction}");
+                Console.WriteLine($"[DestinyEncoder]     BallData: maxVel={data.MaxVelocity}, speedFrac={data.SpeedFraction}, agility={data.Agility}");
             }
 
             // -------------------------
@@ -174,6 +177,10 @@ namespace EVESharp.Destiny
                 for (int i = 0; i < minis.Length; i++)
                     WriteMiniBall(writer, minis[i]);
             }
+
+            // Name field (Apocrypha format): byte nameWords, then nameWords*2 bytes of Unicode.
+            // Writing 0 = "no name" (just the single count byte).
+            writer.Write((byte)0);
         }
 
         // =====================================================================
@@ -187,72 +194,73 @@ namespace EVESharp.Destiny
         }
 
         // =====================================================================
-        // State struct writers (CORRECTED to match actual struct definitions)
+        // State struct writers (Apocrypha format)
         // =====================================================================
         private static void WriteFollowState(BinaryWriter writer, FollowState state)
         {
-            // FollowState: UnkFollowId (long), UnkRange (float)
-            writer.Write(state.UnkFollowId);
-            writer.Write(state.UnkRange);
+            // FollowState: FollowId (int), FollowRange (double)
+            writer.Write(state.FollowId);          // int (4 bytes)
+            writer.Write(state.FollowRange);        // double (8 bytes)
         }
 
         private static void WriteFormationState(BinaryWriter writer, FormationState state)
         {
-            // FormationState: Unk01 (long), Unk02 (float), Unk03 (float)
-            writer.Write(state.Unk01);
-            writer.Write(state.Unk02);
-            writer.Write(state.Unk03);
+            // FormationState: FollowId (int), FollowRange (double), EffectStamp (int)
+            writer.Write(state.FollowId);          // int (4 bytes)
+            writer.Write(state.FollowRange);        // double (8 bytes)
+            writer.Write(state.EffectStamp);        // int (4 bytes)
         }
 
         private static void WriteTrollState(BinaryWriter writer, TrollState state)
         {
-            // TrollState: Unk01 (float)
-            writer.Write(state.Unk01);
+            // TrollState: EffectStamp (int)
+            writer.Write(state.EffectStamp);        // int (4 bytes)
         }
 
         private static void WriteMissileState(BinaryWriter writer, MissileState state)
         {
-            // MissileState: UnkFollowId (long), Unk01 (float), UnkSourceId (long),
-            //               Unk02 (float), Unk03 (Vector3)
-            writer.Write(state.UnkFollowId);
-            writer.Write(state.Unk01);
-            writer.Write(state.UnkSourceId);
-            writer.Write(state.Unk02);
-            WriteVector3(writer, state.Unk03);
+            // MissileState: FollowId (int), FollowRange (double), OwnerId (int),
+            //               EffectStamp (int), Location (Vector3)
+            writer.Write(state.FollowId);          // int (4 bytes)
+            writer.Write(state.FollowRange);        // double (8 bytes)
+            writer.Write(state.OwnerId);           // int (4 bytes)
+            writer.Write(state.EffectStamp);        // int (4 bytes)
+            WriteVector3(writer, state.Location);   // 24 bytes
         }
 
         private static void WriteGotoState(BinaryWriter writer, GotoState state)
         {
-            // GotoState: Location (Vector3) - 24 bytes
+            // GotoState: Location (Vector3) - 24 bytes (unchanged)
             WriteVector3(writer, state.Location);
             Console.WriteLine($"[DestinyEncoder]     GotoState: target=({state.Location.X:F0},{state.Location.Y:F0},{state.Location.Z:F0})");
         }
 
         private static void WriteWarpState(BinaryWriter writer, WarpState state)
         {
-            // WarpState: Location (Vector3), EffectStamp (int), 
-            //            Unk01 (long), FollowId (long), OwnerId (long)
-            WriteVector3(writer, state.Location);
-            writer.Write(state.EffectStamp);
-            writer.Write(state.Unk01);
-            writer.Write(state.FollowId);
-            writer.Write(state.OwnerId);
+            // WarpState: Location (Vector3), EffectStamp (int),
+            //            FollowRange (double), FollowId (int), OwnerId (int)
+            WriteVector3(writer, state.Location);   // 24 bytes
+            writer.Write(state.EffectStamp);        // int (4 bytes)
+            writer.Write(state.FollowRange);        // double (8 bytes)
+            writer.Write(state.FollowId);           // int (4 bytes)
+            writer.Write(state.OwnerId);            // int (4 bytes)
         }
 
         private static void WriteMushroomState(BinaryWriter writer, MushroomState state)
         {
-            // MushroomState: Unk01 (float), Unk02 (long), Unk03 (float), Unk04 (long)
-            writer.Write(state.Unk01);
-            writer.Write(state.Unk02);
-            writer.Write(state.Unk03);
-            writer.Write(state.Unk04);
+            // MushroomState: FollowRange (double), Unknown (double),
+            //                EffectStamp (int), OwnerId (int)
+            writer.Write(state.FollowRange);        // double (8 bytes)
+            writer.Write(state.Unknown);            // double (8 bytes)
+            writer.Write(state.EffectStamp);        // int (4 bytes)
+            writer.Write(state.OwnerId);            // int (4 bytes)
         }
 
         private static void WriteMiniBall(BinaryWriter writer, MiniBall mini)
         {
-            // MiniBall: Offset (Vector3), Radius (float)
+            // MiniBall: Offset (Vector3), Radius (double)
             WriteVector3(writer, mini.Offset);
-            writer.Write(mini.Radius);
+            writer.Write(mini.Radius);              // double (8 bytes - Apocrypha!)
         }
 
         // =====================================================================

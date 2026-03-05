@@ -366,6 +366,16 @@ public class Items : IItems
 
         return result;
     }
+
+    public ConcurrentDictionary <int, ItemEntity> LoadAllItemsLocatedAt (ItemEntity location)
+    {
+        ConcurrentDictionary <int, ItemEntity> result = new ConcurrentDictionary <int, ItemEntity> ();
+
+        foreach (int itemID in this.ItemDB.LoadAllItemsLocatedAt (location.ID))
+            result [itemID] = this.LoadItem (itemID);
+
+        return result;
+    }
     
     public bool IsItemLoaded (int itemID)
     {

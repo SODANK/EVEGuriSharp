@@ -1,6 +1,4 @@
 using System;
-using System.IO;
-using System.Collections.Generic;
 using EVESharp.Types;
 using EVESharp.Database;
 using EVESharp.Database.Extensions;
@@ -20,7 +18,8 @@ using EVESharp.EVE.Notifications;
 using EVESharp.EVE.Notifications.Inventory;
 using EVESharp.EVE.Sessions;
 using EVESharp.Types.Collections;
-using EVESharp.Destiny;
+using EVESharp.Node.Services.Space;
+using Serilog;
 
 
 namespace EVESharp.Node.Services.Inventory;
@@ -39,13 +38,15 @@ public class ship : ClientBoundService
     private IDatabase Database { get; }
     private IDogmaItems DogmaItems { get; }
     private INotificationSender NotificationSender { get; }
+    private SolarSystemDestinyManager SolarSystemDestinyMgr { get; }
+    private ILogger Log { get; }
 
     public ship(
         IItems items, IBoundServiceManager manager, ISessionManager sessionManager, IDogmaNotifications dogmaNotifications,
-        IDatabase database, ISolarSystems solarSystems, IDogmaItems dogmaItems, INotificationSender notificationSender
+        IDatabase database, ISolarSystems solarSystems, IDogmaItems dogmaItems, INotificationSender notificationSender,
+        SolarSystemDestinyManager solarSystemDestinyMgr, ILogger logger
     ) : base(manager)
     {
-        Console.WriteLine("[DEBUG] Node.Services.Inventory.ship (global service) constructed");
         Items = items;
         SessionManager = sessionManager;
         DogmaNotifications = dogmaNotifications;
@@ -53,15 +54,16 @@ public class ship : ClientBoundService
         SolarSystems = solarSystems;
         DogmaItems = dogmaItems;
         NotificationSender = notificationSender;
+        SolarSystemDestinyMgr = solarSystemDestinyMgr;
+        Log = logger;
     }
 
     protected ship(
         ItemEntity location, IItems items, IBoundServiceManager manager, ISessionManager sessionManager,
         IDogmaNotifications dogmaNotifications, Session session, ISolarSystems solarSystems, IDogmaItems dogmaItems,
-        INotificationSender notificationSender
+        INotificationSender notificationSender, SolarSystemDestinyManager solarSystemDestinyMgr, ILogger logger
     ) : base(manager, session, location.ID)
     {
-        Console.WriteLine("[DEBUG] Node.Services.Inventory.ship (bound instance) constructed for objectID=" + location.ID);
         Location = location;
         Items = items;
         SessionManager = sessionManager;
@@ -69,6 +71,8 @@ public class ship : ClientBoundService
         SolarSystems = solarSystems;
         DogmaItems = dogmaItems;
         NotificationSender = notificationSender;
+        SolarSystemDestinyMgr = solarSystemDestinyMgr;
+        Log = logger;
     }
 
     public PyInteger LeaveShip(ServiceCall call)
@@ -172,7 +176,9 @@ public class ship : ClientBoundService
             call.Session,
             this.SolarSystems,
             DogmaItems,
-            NotificationSender
+            NotificationSender,
+            SolarSystemDestinyMgr,
+            Log
         );
     }
 
@@ -194,7 +200,7 @@ public class ship : ClientBoundService
         int shipID    = session.ShipID ?? 0;
         int stationID = session.StationID;
 
-        Console.WriteLine($"[ship] Undock() START: char={charID}, station={stationID}, shipID={shipID}");
+        Log.Information("[ship] Undock() START: char={CharID}, station={StationID}, shipID={ShipID}", charID, stationID, shipID);
 
         // ----------------------------
         // 1. STATIC STATION LOOKUP
@@ -207,7 +213,7 @@ public class ship : ClientBoundService
         int constellationID = station.ConstellationID;
         int regionID        = station.RegionID;
 
-        Console.WriteLine($"[ship] Undock: system={solarSystemID}, constellation={constellationID}, region={regionID}");
+        Log.Information("[ship] Undock: system={SolarSystemID}, constellation={ConstellationID}, region={RegionID}", solarSystemID, constellationID, regionID);
 
         // ----------------------------
         // 2. UPDATE SHIP POSITION
@@ -225,11 +231,19 @@ public class ship : ClientBoundService
             shipEntity.Y = undockY;
             shipEntity.Z = undockZ;
 
-            Console.WriteLine($"[ship] Undock: Set ship position to ({undockX:F0}, {undockY:F0}, {undockZ:F0})");
+            Log.Information("[ship] Undock: Set ship position to ({X:F0}, {Y:F0}, {Z:F0})", undockX, undockY, undockZ);
         }
 
         // ----------------------------
-        // 3. SESSION CHANGE
+        // 3. STORE UNDOCK STATION FOR BEYONCE
+        // ----------------------------
+        // beyonce's bound constructor runs AFTER the session change clears StationID,
+        // so we store it here for beyonce to retrieve later.
+        SolarSystemDestinyMgr.SetUndockStation(charID, stationID);
+        Log.Information("[ship] Undock: Stored undock station {StationID} for char {CharID}", stationID, charID);
+
+        // ----------------------------
+        // 4. SESSION CHANGE
         // ----------------------------
         var delta = new Session();
 
@@ -241,23 +255,18 @@ public class ship : ClientBoundService
         delta[Session.REGION_ID]        = (PyInteger)regionID;
         delta[Session.SHIP_ID]          = (PyInteger)shipID;
 
-        Console.WriteLine("[ship] Undock: Performing session update...");
+        Log.Information("[ship] Undock: Performing session update...");
         this.SessionManager.PerformSessionUpdate(Session.CHAR_ID, charID, delta);
-        Console.WriteLine("[ship] Undock: Session update completed");
+        Log.Information("[ship] Undock: Session update completed");
 
-        // ----------------------------
-        // 4. RETURN - NO DoDestinyUpdate HERE!
-        // ----------------------------
-        // The client will:
-        //   1. Receive session change notification
-        //   2. Call AddBallpark() which creates the destiny.Ballpark
-        //   3. Bind to beyonce service
-        //   4. Call beyonce::GetFormations()
-        //   5. beyonce::GetFormations() sends DoDestinyUpdate notification
-        // 
-        // This ordering ensures the client's ballpark is ready to receive the state.
+        // NOTE: DoDestinyUpdate is NOT sent here. The client error log proves
+        // this notification arrives BEFORE the ballpark is created, causing:
+        //   "RuntimeError: No ballpark for update" in michelle.py(462)
+        // Instead, DoDestinyUpdate is sent from beyonce's bound constructor,
+        // which runs AFTER the client creates the ballpark and binds the moniker.
 
-        Console.WriteLine("[ship] Undock() COMPLETE - returning PyNone (beyonce will send state)");
+        Log.Information("[ship] Undock() COMPLETE (session changed, awaiting beyonce bind for state)");
         return new PyNone();
     }
+
 }

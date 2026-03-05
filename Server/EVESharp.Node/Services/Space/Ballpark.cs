@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using EVESharp.Destiny;
 using EVESharp.EVE.Data.Inventory.Items;
 
 namespace EVESharp.Node.Services.Space
@@ -9,7 +10,9 @@ namespace EVESharp.Node.Services.Space
         public int SolarSystemID { get; }
         public int OwnerID       { get; }
 
-        // Public readonly access for snapshot builder
+        public BubbleManager BubbleManager { get; } = new BubbleManager();
+
+        // Public readonly access for snapshot builder (backward-compatible)
         public IReadOnlyDictionary<int, ItemEntity> Entities => mEntities;
 
         private readonly Dictionary<int, ItemEntity> mEntities =
@@ -27,6 +30,19 @@ namespace EVESharp.Node.Services.Space
                 throw new ArgumentNullException(nameof(entity));
 
             mEntities[entity.ID] = entity;
+        }
+
+        /// <summary>
+        /// Add an entity and also register it in the bubble system.
+        /// </summary>
+        public BubbleEntity AddEntityWithBubble(ItemEntity entity, BubbleEntity bubbleEntity)
+        {
+            if (entity == null)
+                throw new ArgumentNullException(nameof(entity));
+
+            mEntities[entity.ID] = entity;
+            BubbleManager.AddEntity(bubbleEntity);
+            return bubbleEntity;
         }
 
         public bool TryGetEntity(int itemID, out ItemEntity ent)

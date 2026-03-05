@@ -1,0 +1,23 @@
+58-celestials.sql - Instructions
+=================================
+
+This script populates celestial objects (Sun, Planet, Moon, AsteroidBelt, Stargate)
+from mapDenormalize into invItems, eveNames, and invPositions so they are visible
+in space after undocking.
+
+Prerequisite:
+  - mapDenormalize must already be populated (from apo15-mysql5-v1.sql)
+
+How to run:
+  1. Open your MySQL client (HeidiSQL, MySQL Workbench, or command line)
+  2. Select your EVESharp database
+  3. Run the file: source 58-celestials.sql
+     Or copy/paste the contents and execute
+
+Command line example:
+  mysql -u root -p evesharp < 58-celestials.sql
+
+Notes:
+  - Safe to run multiple times (uses REPLACE INTO)
+  - Does NOT drop or recreate any tables
+  - Only inserts groups 6-10: Sun, Planet, Moon, AsteroidBelt, Stargate

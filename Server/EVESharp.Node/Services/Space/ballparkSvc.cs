@@ -13,8 +13,9 @@ using EVESharp.Types.Serialization;
 
 namespace EVESharp.Node.Services.Space
 {
-    // IMPORTANT: name is "ballpark" so moniker.GetBallPark(...) can find it
-    [ConcreteService("beyonce")]
+    // DISABLED: consolidated into beyonce.cs which is now the single ballpark service.
+    // Kept for reference only — not registered in DI container.
+    [ConcreteService("ballparkSvc_disabled")]
     public class ballparkSvc : ClientBoundService
     {
         private Ballpark mBallpark;
@@ -272,9 +273,9 @@ namespace EVESharp.Node.Services.Space
             var header = new BallHeader
             {
                 ItemId   = ent.ID,
-                Location = new Vector3 { X = x, Y = y, Z = z },
-                Radius   = 1000.0f,
                 Mode     = BallMode.Stop,
+                Radius   = 1000.0,
+                Location = new Vector3 { X = x, Y = y, Z = z },
                 Flags    = BallFlag.IsFree | BallFlag.IsMassive | BallFlag.IsInteractive
             };
 
@@ -283,11 +284,11 @@ namespace EVESharp.Node.Services.Space
             // ------------------------------------------------------------------
             var extra = new ExtraBallHeader
             {
-                AllianceId    = 0,
-                CorporationId = 0,
+                Mass          = 1.0,
                 CloakMode     = CloakMode.Normal,
-                Harmonic      = 1.0f,
-                Mass          = 1.0f
+                Harmonic      = 0xFFFFFFFFFFFFFFFF,
+                CorporationId = 0,
+                AllianceId    = 0
             };
 
             // ------------------------------------------------------------------
@@ -295,10 +296,11 @@ namespace EVESharp.Node.Services.Space
             // ------------------------------------------------------------------
             var data = new BallData
             {
-                MaxVelocity   = 200.0f,
-                SpeedFraction = 0.0f,
-                Unk03         = 0.0f,
-                Velocity      = new Vector3 { X = 0, Y = 0, Z = 0 }
+                MaxVelocity   = 200.0,
+                Velocity      = new Vector3 { X = 0, Y = 0, Z = 0 },
+                UnknownVec    = default,
+                Agility       = 1.0,
+                SpeedFraction = 0.0
             };
 
             // ------------------------------------------------------------------

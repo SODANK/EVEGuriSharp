@@ -19,8 +19,8 @@ namespace EVESharp.Node.Services.Space
     /// - A way to hand the client a proper ballpark moniker (GetBallpark)
     /// - Safe stubs for other calls the client might make
     ///
-    /// The real space state and Destiny snapshot are provided by ballparkSvc
-    /// and by notifications such as DoDestinyUpdate.
+    /// The real space state and Destiny snapshot are provided by beyonce
+    /// (the bound ballpark service) via DoDestinyUpdate notifications.
     /// </summary>
     [ConcreteService("michelle")]
     public class michelle : ClientBoundService
@@ -93,12 +93,11 @@ namespace EVESharp.Node.Services.Space
         // GetInitialState
         //
         // Some EVE builds call michelle.GetInitialState() on the server side,
-        // but in Apocrypha the real space snapshot is obtained from ballparkSvc:
-        //   - ballpark.GetBallPark(solarSystemID)
-        //   - ballpark.UpdateStateRequest() / GetInitialState()
+        // but in Apocrypha the real space snapshot comes via DoDestinyUpdate
+        // notification, sent by the beyonce bound service during Moniker.Bind().
         //
-        // Returning an empty dict here is safe: the client will still rely on
-        // the ballpark service for the actual SetState / Destiny data.
+        // Returning an empty dict here is safe: the client gets its state
+        // from the DoDestinyUpdate notification, not from this method.
         // ---------------------------------------------------------------------
         public PyDataType GetInitialState(ServiceCall call)
         {
@@ -110,7 +109,7 @@ namespace EVESharp.Node.Services.Space
                 call.Session.SolarSystemID
             );
 
-            // Empty dict – we do NOT try to duplicate ballparkSvc's snapshot.
+            // Empty dict – state comes from beyonce's DoDestinyUpdate notification.
             return new PyDictionary();
         }
 
@@ -147,7 +146,7 @@ namespace EVESharp.Node.Services.Space
             call.Session.SolarSystemID  = solID;
             call.Session.SolarSystemID2 = solID;
             call.Session.BallparkID     = solID;
-            call.Session.BallparkBroker = "ballpark";
+            call.Session.BallparkBroker = "beyonce";
 
             Console.WriteLine(
                 "[michelle] AddBallpark: session after: stationID={0}, solarsystemID={1}, solarsystemID2={2}, ballparkID={3}, ballparkBroker={4}",
@@ -166,12 +165,12 @@ namespace EVESharp.Node.Services.Space
         // ---------------------------------------------------------------------
         // GetBallpark
         //
-        // Utility method that mirrors ballparkSvc.GetBallPark, returning the
+        // Utility method that mirrors beyonce.GetBallPark, returning the
         // (nodeID, service, objectID) tuple the client moniker code expects.
         //
         // Some client codepaths might ask the "michelle" service for a ballpark
         // descriptor; this provides a stable answer that simply points back to
-        // the real ballparkSvc.
+        // the real beyonce service.
         // ---------------------------------------------------------------------
         public PyDataType GetBallpark(ServiceCall call, PyInteger solarSystemID)
         {
@@ -183,17 +182,17 @@ namespace EVESharp.Node.Services.Space
             var desc = new PyDictionary
             {
                 ["nodeID"]   = new PyInteger(BoundServiceManager.MachoNet.NodeID),
-                ["service"]  = new PyString("ballpark"),
+                ["service"]  = new PyString("beyonce"),
                 ["objectID"] = new PyInteger(solID)
             };
 
             Console.WriteLine(
-                "[michelle] GetBallpark: returning KeyVal(nodeID={0}, service='ballpark', objectID={1})",
+                "[michelle] GetBallpark: returning KeyVal(nodeID={0}, service='beyonce', objectID={1})",
                 BoundServiceManager.MachoNet.NodeID,
                 solID
             );
 
-            // util.KeyVal with nodeID/service/objectID – this is what moniker expects.
+            // util.KeyVal with nodeID/service/objectID – must match [ConcreteService("beyonce")].
             return new PyObjectData("util.KeyVal", desc);
         }
 
@@ -220,7 +219,7 @@ namespace EVESharp.Node.Services.Space
             );
 
             // We don't mutate anything here — the authoritative Destiny state
-            // is handled by ballparkSvc + notifications.
+            // is handled by beyonce + DoDestinyUpdate notifications.
             return new PyNone();
         }
 
@@ -241,7 +240,7 @@ namespace EVESharp.Node.Services.Space
                 balls?.Count ?? 0
             );
 
-            // No-op for now; simulation is driven by ballparkSvc / Destiny snapshots.
+            // No-op for now; simulation is driven by beyonce / Destiny snapshots.
             return new PyNone();
         }
 

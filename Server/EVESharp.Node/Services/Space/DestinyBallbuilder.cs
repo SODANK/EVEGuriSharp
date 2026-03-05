@@ -39,9 +39,9 @@ namespace EVESharp.Node.Services.Space
             BallHeader header = new BallHeader
             {
                 ItemId   = ent.ID,
-                Location = new Vector3 { X = x, Y = y, Z = z },
-                Radius   = isEgo ? 50.0f : 500.0f,  // Ship radius vs station/other
                 Mode     = BallMode.Stop,           // Not moving initially
+                Radius   = isEgo ? 50.0 : 500.0,   // Ship radius vs station/other
+                Location = new Vector3 { X = x, Y = y, Z = z },
                 Flags    = flags
             };
 
@@ -51,11 +51,11 @@ namespace EVESharp.Node.Services.Space
             // -------------------------------------------------------
             ExtraBallHeader extra = new ExtraBallHeader
             {
-                AllianceId    = 0,
-                CorporationId = 0,
+                Mass          = 1.0,
                 CloakMode     = CloakMode.Normal,
-                Harmonic      = -1.0f,    // Default harmonic value
-                Mass          = 1.0
+                Harmonic      = 0xFFFFFFFFFFFFFFFF,
+                CorporationId = 0,
+                AllianceId    = 0
             };
 
             // -------------------------------------------------------
@@ -67,10 +67,11 @@ namespace EVESharp.Node.Services.Space
             {
                 data = new BallData
                 {
-                    MaxVelocity   = 200f,   // Will be overridden by ship type
-                    SpeedFraction = 0f,     // Not moving
-                    Unk03         = 0f,
-                    Velocity      = new Vector3 { X = 0, Y = 0, Z = 0 }
+                    MaxVelocity   = 200.0,   // Will be overridden by ship type
+                    Velocity      = new Vector3 { X = 0, Y = 0, Z = 0 },
+                    UnknownVec    = default,
+                    Agility       = 1.0,
+                    SpeedFraction = 0.0      // Not moving
                 };
             }
 
@@ -82,7 +83,7 @@ namespace EVESharp.Node.Services.Space
                 Header      = header,
                 ExtraHeader = extra,
                 Data        = header.Flags.HasFlag(BallFlag.IsFree) ? data : default,
-                FormationId = 0,
+                FormationId = 0xFF,
 
                 // Mode-specific states - not needed for Stop mode
                 FollowState    = default,
@@ -116,9 +117,9 @@ namespace EVESharp.Node.Services.Space
             BallHeader header = new BallHeader
             {
                 ItemId   = stationEnt.ID,
-                Location = new Vector3 { X = x, Y = y, Z = z },
-                Radius   = 5000.0f,  // Station radius
                 Mode     = BallMode.Rigid,  // Stations are rigid - no movement
+                Radius   = 5000.0,          // Station radius
+                Location = new Vector3 { X = x, Y = y, Z = z },
                 Flags    = BallFlag.IsGlobal | BallFlag.IsMassive
             };
 
@@ -128,7 +129,7 @@ namespace EVESharp.Node.Services.Space
                 Header      = header,
                 ExtraHeader = null,  // Not needed for Rigid
                 Data        = default,
-                FormationId = 0,
+                FormationId = 0xFF,
 
                 FollowState    = default,
                 FormationState = default,

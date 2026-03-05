@@ -116,7 +116,7 @@ public class Marshal
     {
         if (data is null || data is PyNone)
             return false;
-        if (data is PyString {IsStringTableEntry: false} pyString && pyString.Value.Length > 1 && pyString.IsUTF8 == false)
+        if (data is PyString {IsStringTableEntry: false} pyString && pyString.Value is not null && pyString.Value.Length > 1 && pyString.IsUTF8 == false)
             return true;
         if (data is PyTuple {Count: > 0})
             return true;

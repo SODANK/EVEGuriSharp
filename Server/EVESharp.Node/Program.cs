@@ -211,6 +211,8 @@ namespace EVESharp.Node
             container.RegisterInstance(configuration.Logging);
             container.RegisterInstance(configuration.Character);
             container.Register<beyonce>(Lifestyle.Singleton);
+            container.Register<DestinyBroadcaster>(Lifestyle.Singleton);
+            container.Register<SolarSystemDestinyManager>(Lifestyle.Singleton);
 
             // register logging system
             container.RegisterInstance(baseLogger);
@@ -322,7 +324,7 @@ namespace EVESharp.Node
             container.Register<EffectsManager>(Lifestyle.Singleton);
             container.Register<inventoryInsurancesSvc>(Lifestyle.Singleton);
             container.Register<SpaceServiceRegistrar>(Lifestyle.Singleton);
-            container.Register<ballparkSvc>(Lifestyle.Singleton);
+            // ballparkSvc removed — beyonce is the single consolidated ballpark service
             container.Register<michelle>(Lifestyle.Singleton);
 
             // depending on the server mode initialize a different macho instance
