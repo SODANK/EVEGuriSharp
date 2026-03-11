@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\destinyballbuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\destinyballbuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\characters\\character.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\characters\\character.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\inventory\\ship.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\inventory\\ship.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -19,10 +27,6 @@
       "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\characters\\character.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\characters\\character.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\michelle.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\michelle.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -33,10 +37,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{0CA562B7-141F-40DC-A408-B0BACE964169}|EVESharp.Destiny\\EVESharp.Destiny.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.destiny\\destinybinaryencoder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{0CA562B7-141F-40DC-A408-B0BACE964169}|EVESharp.Destiny\\EVESharp.Destiny.csproj|solutionrelative:evesharp.destiny\\destinybinaryencoder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\destinyballbuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|solutionrelative:evesharp.node\\services\\space\\destinyballbuilder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{78C8FBA0-95A0-4FD6-B2E9-80AC22563D76}|EVESharp.Node\\EVESharp.Node.csproj|c:\\users\\fendi\\desktop\\evesharp\\server\\evesharp.node\\services\\space\\spaceserviceregistrar.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -94,11 +94,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "beyonce.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\beyonce.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\beyonce.cs",
@@ -110,7 +110,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 5,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Program.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Program.cs",
@@ -122,20 +122,19 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "ship.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Inventory\\ship.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Inventory\\ship.cs",
               "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Inventory\\ship.cs",
               "RelativeToolTip": "EVESharp.Node\\Services\\Inventory\\ship.cs",
-              "ViewState": "AgIAAM4AAAAAAAAAAAAgwOAAAAAJAAAAAAAAAA==",
+              "ViewState": "AgIAAM4AAAAAAAAAAAAgwOEAAAAyAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-08T08:52:37.452Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-08T08:52:37.452Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 1,
               "Title": "character.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Characters\\character.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Characters\\character.cs",
@@ -147,19 +146,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 0,
               "Title": "DestinyBallbuilder.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
               "ToolTip": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
               "RelativeToolTip": "EVESharp.Node\\Services\\Space\\DestinyBallbuilder.cs",
-              "ViewState": "AgIAAAwAAAAAAAAAAAArwBQAAAAaAAAAAAAAAA==",
+              "ViewState": "AgIAABsAAAAAAAAAAADgvycAAAANAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-02T21:48:35.216Z"
+              "WhenOpened": "2025-12-02T21:48:35.216Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "DestinyBinaryEncoder.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Destiny\\DestinyBinaryEncoder.cs",
               "RelativeDocumentMoniker": "EVESharp.Destiny\\DestinyBinaryEncoder.cs",
@@ -171,7 +171,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "michelle.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\michelle.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\michelle.cs",
@@ -183,7 +183,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "ballparkSvc.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Space\\ballparkSvc.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Space\\ballparkSvc.cs",
@@ -195,7 +195,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "stationSvc.cs",
               "DocumentMoniker": "C:\\Users\\Fendi\\Desktop\\EVESharp\\Server\\EVESharp.Node\\Services\\Stations\\stationSvc.cs",
               "RelativeDocumentMoniker": "EVESharp.Node\\Services\\Stations\\stationSvc.cs",

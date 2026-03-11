@@ -425,25 +425,19 @@ public class DogmaItems : IDogmaItems
         // persist the item (including singleton change) to the database
         item.Persist ();
 
-        ItemEffects effects = EffectsManager.GetForItem (shipModule, session);
+        // GetForItem creates ItemEffects whose constructor applies passive effects,
+        // so it must be inside the try-catch to properly roll back on failure
+        ItemEffects effects = null;
 
-        // throw the effects in and hope they stick
         try
         {
-            Log.Information ("[DogmaItems] FitInto(1): Applying passive effects for itemID={ItemID}", item.ID);
-            // apply all passive effects (this also blocks the item fitting if the initialization fails)
-            effects?.ApplyPassiveEffects (session);
-            // TODO: extra check, ensure that the character has the required skills?
+            effects = EffectsManager.GetForItem (shipModule, session);
 
-            if (shipModule?.IsRigSlot () == false)
-            {
-                Log.Information ("[DogmaItems] FitInto(1): Applying online effect for itemID={ItemID}", item.ID);
-                effects?.ApplyEffect ("online", session);
-            }
+            Log.Information ("[DogmaItems] FitInto(1): Passive effects applied for itemID={ItemID}", item.ID);
         }
         catch (UserError e)
         {
-            Log.Warning ("[DogmaItems] FitInto(1): UserError during effects for itemID={ItemID}: {Error}", item.ID, e.Message);
+            Log.Warning ("[DogmaItems] FitInto(1): UserError during passive effects for itemID={ItemID}: {Error}", item.ID, e.Message);
 
             effects?.StopApplyingPassiveEffects (session);
 
@@ -475,6 +469,20 @@ public class DogmaItems : IDogmaItems
             }
 
             throw;
+        }
+
+        // online effect is separate — if it fails, the module stays fitted but offline
+        if (shipModule?.IsRigSlot () == false)
+        {
+            try
+            {
+                Log.Information ("[DogmaItems] FitInto(1): Applying online effect for itemID={ItemID}", item.ID);
+                effects?.ApplyEffect ("online", session);
+            }
+            catch (System.Exception e)
+            {
+                Log.Warning ("[DogmaItems] FitInto(1): Online effect failed for itemID={ItemID}: {Error} — module stays offline", item.ID, e.Message);
+            }
         }
 
         Log.Information ("[DogmaItems] FitInto(1): Complete for itemID={ItemID}", item.ID);
@@ -524,25 +532,19 @@ public class DogmaItems : IDogmaItems
         // persist the item (including singleton change) to the database
         item.Persist ();
 
-        ItemEffects effects = EffectsManager.GetForItem (shipModule, session);
+        // GetForItem creates ItemEffects whose constructor applies passive effects,
+        // so it must be inside the try-catch to properly roll back on failure
+        ItemEffects effects = null;
 
-        // throw the effects in and hope they stick
         try
         {
-            Log.Information ("[DogmaItems] FitInto(2): Applying passive effects for itemID={ItemID}", item.ID);
-            // apply all passive effects (this also blocks the item fitting if the initialization fails)
-            effects?.ApplyPassiveEffects (session);
-            // TODO: extra check, ensure that the character has the required skills?
+            effects = EffectsManager.GetForItem (shipModule, session);
 
-            if (shipModule?.IsRigSlot () == false)
-            {
-                Log.Information ("[DogmaItems] FitInto(2): Applying online effect for itemID={ItemID}", item.ID);
-                effects?.ApplyEffect ("online", session);
-            }
+            Log.Information ("[DogmaItems] FitInto(2): Passive effects applied for itemID={ItemID}", item.ID);
         }
         catch (UserError e)
         {
-            Log.Warning ("[DogmaItems] FitInto(2): UserError during effects for itemID={ItemID}: {Error}", item.ID, e.Message);
+            Log.Warning ("[DogmaItems] FitInto(2): UserError during passive effects for itemID={ItemID}: {Error}", item.ID, e.Message);
 
             effects?.StopApplyingPassiveEffects (session);
 
@@ -574,6 +576,20 @@ public class DogmaItems : IDogmaItems
             }
 
             throw;
+        }
+
+        // online effect is separate — if it fails, the module stays fitted but offline
+        if (shipModule?.IsRigSlot () == false)
+        {
+            try
+            {
+                Log.Information ("[DogmaItems] FitInto(2): Applying online effect for itemID={ItemID}", item.ID);
+                effects?.ApplyEffect ("online", session);
+            }
+            catch (System.Exception e)
+            {
+                Log.Warning ("[DogmaItems] FitInto(2): Online effect failed for itemID={ItemID}: {Error} — module stays offline", item.ID, e.Message);
+            }
         }
 
         Log.Information ("[DogmaItems] FitInto(2): Complete for itemID={ItemID}", item.ID);

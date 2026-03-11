@@ -368,16 +368,74 @@ public class BoundInventory : ClientBoundService
                 throw new CrpAccessDenied ("You are not allowed to access that hangar");
         }
 
-        // special situation, if the new location is a module slot ensure the item is a singleton (TODO: HANDLE CHARGES TOO)
+        // special situation, if the new location is a module slot
         if (newFlag.IsModule ())
         {
-            Console.WriteLine ($"[BoundInventory] Fitting item {item.ID} (type={item.Type.ID}, isShipModule={item is ShipModule}) to slot {newFlag} on {this.mInventory.ID}");
+            if (item is ShipModule)
+            {
+                Console.WriteLine ($"[BoundInventory] Fitting module {item.ID} (type={item.Type.ID}) to slot {newFlag} on {this.mInventory.ID}");
 
-            DogmaItems.FitInto (
-                item, this.mInventory.ID, this.mInventory.OwnerID, newFlag, session
-            );
+                DogmaItems.FitInto (
+                    item, this.mInventory.ID, this.mInventory.OwnerID, newFlag, session
+                );
 
-            Console.WriteLine ($"[BoundInventory] Fit complete for item {item.ID}");
+                Console.WriteLine ($"[BoundInventory] Fit complete for item {item.ID}");
+            }
+            else
+            {
+                // charges/ammo going into a module slot — validate compatibility and capacity
+                Console.WriteLine ($"[BoundInventory] Loading charge {item.ID} (type={item.Type.ID}) into slot {newFlag} on {this.mInventory.ID}");
+
+                // resolve the actual ship so we can inspect modules and existing charges
+                Ship ship = this.mInventory as Ship;
+                if (ship == null && Items.TryGetItem (this.mInventory.ID, out ItemEntity shipEntity))
+                    ship = shipEntity as Ship;
+
+                if (ship == null)
+                    throw new CustomError ("Cannot load charges outside of a ship");
+
+                // find the module occupying this slot
+                ShipModule moduleInSlot = ship.Items.Values
+                    .FirstOrDefault (i => i.Flag == newFlag && i is ShipModule) as ShipModule;
+
+                if (moduleInSlot == null)
+                    throw new CustomError ("No module in that slot");
+
+                // charge group compatibility — module's chargeGroup1-5 must include the charge's group
+                int chargeGroupID = item.Type.Group.ID;
+                bool groupOK = false;
+                AttributeTypes [] chargeGroupAttrs = {
+                    AttributeTypes.chargeGroup1, AttributeTypes.chargeGroup2, AttributeTypes.chargeGroup3,
+                    AttributeTypes.chargeGroup4, AttributeTypes.chargeGroup5
+                };
+                foreach (var attr in chargeGroupAttrs)
+                    if (moduleInSlot.Attributes.AttributeExists (attr) && (int) moduleInSlot.Attributes [attr].Integer == chargeGroupID)
+                        groupOK = true;
+                if (!groupOK)
+                    throw new CustomError ("Incompatible charge type for this module");
+
+                // charge size compatibility
+                if (moduleInSlot.Attributes.AttributeExists (AttributeTypes.chargeSize) && item.Attributes.AttributeExists (AttributeTypes.chargeSize))
+                    if (moduleInSlot.Attributes [AttributeTypes.chargeSize].Integer != item.Attributes [AttributeTypes.chargeSize].Integer)
+                        throw new CustomError ("Charge size does not fit this module");
+
+                // capacity check — how many charges can this module hold?
+                double moduleCap = moduleInSlot.Attributes.AttributeExists (AttributeTypes.capacity) ? moduleInSlot.Attributes [AttributeTypes.capacity].Float : 0;
+                double chargeVol = item.Attributes.AttributeExists (AttributeTypes.volume) ? item.Attributes [AttributeTypes.volume].Float : 1.0;
+                int maxQty = chargeVol > 0 ? (int) (moduleCap / chargeVol) : 0;
+
+                // check for existing charges already loaded in this slot
+                ItemEntity existingCharge = ship.Items.Values
+                    .FirstOrDefault (i => i.Flag == newFlag && !(i is ShipModule));
+                int usedQty = existingCharge?.Quantity ?? 0;
+                int available = Math.Max (0, maxQty - usedQty);
+
+                int loadQty = Math.Min (quantity == 0 ? item.Quantity : quantity, available);
+                if (loadQty <= 0)
+                    throw new CustomError ("Module is full — no capacity for more charges");
+
+                DogmaItems.SplitStack (item, loadQty, this.mInventory.ID, this.mInventory.OwnerID, newFlag);
+            }
         }
         else
         {

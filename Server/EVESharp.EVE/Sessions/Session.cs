@@ -77,6 +77,7 @@ public class Session : PyDictionary <PyString, PyDataType>
     public const string ROLES_AT_HQ      = "rolesAtHQ";
     public const string ROLES_AT_OTHER   = "rolesAtOther";
     public const string SHIP_ID          = "shipid";
+    public const string SHIP_TYPE_ID     = "shipTypeID";
     public const string STATION_ID       = "stationid";
     public const string SOLAR_SYSTEM_ID  = "solarsystemid";
     public const string LOCATION_ID      = "locationid";
@@ -188,6 +189,11 @@ public class Session : PyDictionary <PyString, PyDataType>
     {
         get => this [SHIP_ID] as PyInteger;
         set => this [SHIP_ID] = value;
+    }
+    public int? ShipTypeID
+    {
+        get => this [SHIP_TYPE_ID] as PyInteger;
+        set => this [SHIP_TYPE_ID] = value;
     }
 
     public int StationID

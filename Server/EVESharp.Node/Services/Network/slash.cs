@@ -6,6 +6,7 @@ using EVESharp.Database.Characters;
 using EVESharp.Database.Inventory;
 using EVESharp.Database.Inventory.Attributes;
 using EVESharp.Database.Inventory.Categories;
+using EVESharp.Database.Inventory.Groups;
 using Attribute = EVESharp.Database.Inventory.Attributes.Attribute;
 using EVESharp.Database.Inventory.Types;
 using EVESharp.Database.Market;
@@ -52,6 +53,7 @@ public class slash : Service
     private         ISessionManager     SessionManager        { get; }
     private         SolarSystemDestinyManager SolarSystemDestinyMgr { get; }
     private         IStandings          Standings             { get; }
+    private         DungeonData         DungeonData           { get; }
 
 public slash
 (
@@ -65,7 +67,8 @@ public slash
     SkillDB             skillDB,
     ISessionManager     sessionManager,
     SolarSystemDestinyManager solarSystemDestinyMgr,
-    IStandings          standings
+    IStandings          standings,
+    DungeonData         dungeonData
 )
 {
     Log                          = logger;
@@ -79,6 +82,7 @@ public slash
     this.SessionManager          = sessionManager;
     this.SolarSystemDestinyMgr   = solarSystemDestinyMgr;
     this.Standings               = standings;
+    this.DungeonData             = dungeonData;
 
     // register commands
     this.mCommands["create"]        = this.CreateCmd;
@@ -103,6 +107,8 @@ public slash
     this.mCommands["setstanding"]   = this.SetStandingCmd;
     this.mCommands["unspawn"]       = this.UnspawnCmd;
     this.mCommands["moveme"]        = this.MoveMeCmd;
+    this.mCommands["kill"]          = this.KillCmd;
+    this.mCommands["dungeon"]       = this.DungeonCmd;
 }
 
 
@@ -155,7 +161,7 @@ public slash
     /// </summary>
     private int ResolveItemTarget (string arg, ServiceCall call)
     {
-        if (arg == "me")
+        if (string.Equals (arg, "me", StringComparison.OrdinalIgnoreCase))
         {
             int? shipID = call.Session.ShipID;
 
@@ -176,7 +182,7 @@ public slash
     /// </summary>
     private int ResolveCharacterTarget (string arg, ServiceCall call)
     {
-        if (arg == "me")
+        if (string.Equals (arg, "me", StringComparison.OrdinalIgnoreCase))
             return call.Session.CharacterID;
 
         if (int.TryParse (arg, out int charID))
@@ -260,7 +266,7 @@ public slash
         int targetCharacterID = 0;
         int originCharacterID = call.Session.CharacterID;
 
-        if (targetCharacter == "me")
+        if (string.Equals (targetCharacter, "me", StringComparison.OrdinalIgnoreCase))
         {
             targetCharacterID = originCharacterID;
         }
@@ -368,7 +374,7 @@ public slash
         string skillType = argv [2];
         int    level     = ParseIntegerThatMightBeDecimal (argv [3]);
 
-        if (target != "me" && target != characterID.ToString ())
+        if (!string.Equals (target, "me", StringComparison.OrdinalIgnoreCase) && target != characterID.ToString ())
             throw new SlashError ("giveskill only supports me for now");
 
         Character character = this.Items.GetItem <Character> (characterID);
@@ -619,7 +625,7 @@ public slash
         newItem.Z = z;
         newItem.Persist ();
 
-        // Register in DestinyManager
+        // Register in DestinyManager and broadcast AddBalls
         if (this.SolarSystemDestinyMgr.TryGet (solarSystemID, out DestinyManager destinyMgr))
         {
             bool isShipCategory = type.Group.Category.ID == (int) CategoryID.Ship;
@@ -649,6 +655,14 @@ public slash
             };
 
             destinyMgr.RegisterEntity (bubble);
+
+            // Send AddBalls to the deploying player via "charid"
+            int charID = call.Session.CharacterID;
+            int stamp = DestinyEventBuilder.GetStamp ();
+            var addBallEvents = DestinyEventBuilder.BuildAddBalls (new[] { bubble }, solarSystemID, stamp);
+            var notification  = DestinyEventBuilder.WrapAsNotification (addBallEvents);
+
+            Notifications.SendNotification ("DoDestinyUpdate", "charid", charID, notification);
         }
 
         Log.Information ("Slash /spawn: spawned typeID={TypeID} as itemID={ItemID} at ({X:F0},{Y:F0},{Z:F0})",
@@ -979,6 +993,7 @@ public slash
 
         Type type   = Types [typeID];
         var  random = new Random ();
+        var  spawnedBubbles = new List<BubbleEntity> ();
 
         for (int i = 0; i < qty; i++)
         {
@@ -1023,22 +1038,38 @@ public slash
                 };
 
                 destinyMgr.RegisterEntity (bubble);
+                spawnedBubbles.Add (bubble);
             }
+        }
+
+        // Send AddBalls to the deploying player via "charid"
+        if (spawnedBubbles.Count > 0)
+        {
+            int charID         = call.Session.CharacterID;
+            int stamp          = DestinyEventBuilder.GetStamp ();
+            var addBallEvents  = DestinyEventBuilder.BuildAddBalls (spawnedBubbles, solarSystemID, stamp);
+            var notification   = DestinyEventBuilder.WrapAsNotification (addBallEvents);
+
+            Notifications.SendNotification ("DoDestinyUpdate", "charid", charID, notification);
         }
 
         Log.Information ("Slash /spawnn: spawned {Qty}x typeID={TypeID} with deviation={Deviation}", qty, typeID, deviation);
     }
 
     /// <summary>
-    /// /entity deploy qty typeID - Spawn NPC entities
+    /// /entity deploy qty typeID [factionID] - Spawn NPC entities with standings-aware AI.
+    /// NPCs will check faction standings against nearby players and engage hostiles.
+    /// Optional factionID sets which faction the NPC belongs to for standing checks.
+    /// Example: /entity deploy 3 23707 500010  (3 Serpentis NPCs, faction=Serpentis)
     /// </summary>
     private void EntityCmd (string [] argv, ServiceCall call)
     {
         if (argv.Length < 4 || argv [1] != "deploy")
-            throw new SlashError ("Usage: /entity deploy <qty> <typeID>");
+            throw new SlashError ("Usage: /entity deploy <qty> <typeID> [factionID]");
 
         int qty    = int.Parse (argv [2]);
         int typeID = int.Parse (argv [3]);
+        int factionID = argv.Length > 4 ? int.Parse (argv [4]) : 0;
 
         if (qty <= 0 || qty > 100)
             throw new SlashError ("qty must be between 1 and 100");
@@ -1065,6 +1096,7 @@ public slash
         }
 
         var random = new Random ();
+        var spawnedBubbles = new List<BubbleEntity> ();
 
         for (int i = 0; i < qty; i++)
         {
@@ -1072,6 +1104,7 @@ public slash
             double y = baseY + (random.NextDouble () * 2 - 1) * 10000;
             double z = baseZ + (random.NextDouble () * 2 - 1) * 10000;
 
+            // Use ownerID=1 (system) — the NPC's faction is set via FactionID on the BubbleEntity
             ItemEntity newItem = DogmaItems.CreateItem <ItemEntity> (
                 type, 1, solarSystemID, Flags.None, 1, true
             );
@@ -1083,6 +1116,8 @@ public slash
 
             if (this.SolarSystemDestinyMgr.TryGet (solarSystemID, out DestinyManager destinyMgr))
             {
+                var spawnPos = new Vector3 { X = x, Y = y, Z = z };
+
                 var bubble = new BubbleEntity
                 {
                     ItemID        = newItem.ID,
@@ -1094,7 +1129,7 @@ public slash
                     CorporationID = 0,
                     AllianceID    = 0,
                     CharacterID   = 0,
-                    Position      = new Vector3 { X = x, Y = y, Z = z },
+                    Position      = spawnPos,
                     Velocity      = default,
                     Mode          = BallMode.Stop,
                     Flags         = BallFlag.IsFree | BallFlag.IsMassive | BallFlag.IsInteractive,
@@ -1102,14 +1137,137 @@ public slash
                     Mass          = 1000000.0,
                     MaxVelocity   = 200.0,
                     SpeedFraction = 0.0,
-                    Agility       = 1.0
+                    Agility       = 1.0,
+                    // NPC AI properties
+                    SpawnPosition = spawnPos
                 };
 
+                // Set faction if explicitly provided
+                if (factionID != 0)
+                    bubble.FactionID = factionID;
+
+                // Populate NPC AI parameters from item attributes (dgmTypeAttributes)
+                PopulateNpcAiParams (bubble, newItem);
+
                 destinyMgr.RegisterEntity (bubble);
+                spawnedBubbles.Add (bubble);
             }
         }
 
-        Log.Information ("Slash /entity: deployed {Qty}x typeID={TypeID}", qty, typeID);
+        // Send AddBalls to the deploying player via "charid" (proven path — same as
+        // beyonce's SetState). The "solarsystemid" broadcast path is unreliable for the
+        // player who issued the command; their client may silently discard it.
+        if (spawnedBubbles.Count > 0)
+        {
+            int charID         = call.Session.CharacterID;
+            int stamp          = DestinyEventBuilder.GetStamp ();
+            var addBallEvents  = DestinyEventBuilder.BuildAddBalls (spawnedBubbles, solarSystemID, stamp);
+            var notification   = DestinyEventBuilder.WrapAsNotification (addBallEvents);
+
+            Notifications.SendNotification ("DoDestinyUpdate", "charid", charID, notification);
+        }
+
+        Log.Information ("Slash /entity: deployed {Qty}x typeID={TypeID} with standings-aware AI", qty, typeID);
+    }
+
+    /// <summary>
+    /// Populate NPC AI parameters from the entity's dgmTypeAttributes.
+    /// Reads entityAttackRange, entityFlyRange, entityChaseMaxDistance, etc.
+    /// Also resolves the NPC's faction from its owner corporation.
+    /// </summary>
+    private void PopulateNpcAiParams (BubbleEntity bubble, ItemEntity item)
+    {
+        var attrs = item.Attributes;
+
+        if (attrs.AttributeExists (AttributeTypes.entityAttackRange))
+            bubble.AttackRange = (double) attrs [AttributeTypes.entityAttackRange];
+
+        if (attrs.AttributeExists (AttributeTypes.entityFlyRange))
+            bubble.OrbitRange = (double) attrs [AttributeTypes.entityFlyRange];
+
+        if (attrs.AttributeExists (AttributeTypes.entityChaseMaxDistance))
+            bubble.ChaseMaxDistance = (double) attrs [AttributeTypes.entityChaseMaxDistance];
+
+        if (attrs.AttributeExists (AttributeTypes.entityAttackDelayMin))
+            bubble.AttackDelayMin = (double) attrs [AttributeTypes.entityAttackDelayMin];
+
+        if (attrs.AttributeExists (AttributeTypes.entityAttackDelayMax))
+            bubble.AttackDelayMax = (double) attrs [AttributeTypes.entityAttackDelayMax];
+
+        if (attrs.AttributeExists (AttributeTypes.maxVelocity))
+            bubble.MaxVelocity = (double) attrs [AttributeTypes.maxVelocity];
+
+        if (attrs.AttributeExists (AttributeTypes.entityCruiseSpeed))
+            bubble.MaxVelocity = (double) attrs [AttributeTypes.entityCruiseSpeed];
+
+        if (attrs.AttributeExists (AttributeTypes.agility))
+            bubble.Agility = (double) attrs [AttributeTypes.agility];
+
+        if (attrs.AttributeExists (AttributeTypes.mass))
+            bubble.Mass = (double) attrs [AttributeTypes.mass];
+
+        if (attrs.AttributeExists (AttributeTypes.radius))
+            bubble.Radius = (double) attrs [AttributeTypes.radius];
+
+        // NPC damage attributes
+        if (attrs.AttributeExists (AttributeTypes.emDamage))
+            bubble.NpcEmDamage = (double) attrs [AttributeTypes.emDamage];
+        if (attrs.AttributeExists (AttributeTypes.explosiveDamage))
+            bubble.NpcExplosiveDamage = (double) attrs [AttributeTypes.explosiveDamage];
+        if (attrs.AttributeExists (AttributeTypes.kineticDamage))
+            bubble.NpcKineticDamage = (double) attrs [AttributeTypes.kineticDamage];
+        if (attrs.AttributeExists (AttributeTypes.thermalDamage))
+            bubble.NpcThermalDamage = (double) attrs [AttributeTypes.thermalDamage];
+
+        // NPC HP
+        if (attrs.AttributeExists (AttributeTypes.shieldCapacity))
+        {
+            bubble.ShieldCapacity = (double) attrs [AttributeTypes.shieldCapacity];
+            bubble.ShieldCharge   = bubble.ShieldCapacity;
+        }
+        if (attrs.AttributeExists (AttributeTypes.armorHP))
+            bubble.ArmorHP = (double) attrs [AttributeTypes.armorHP];
+        if (attrs.AttributeExists (AttributeTypes.hp))
+            bubble.StructureHP = (double) attrs [AttributeTypes.hp];
+
+        // NPC shield resistances
+        if (attrs.AttributeExists (AttributeTypes.shieldEmDamageResonance))
+            bubble.ShieldEmResonance = (double) attrs [AttributeTypes.shieldEmDamageResonance];
+        if (attrs.AttributeExists (AttributeTypes.shieldExplosiveDamageResonance))
+            bubble.ShieldExplosiveResonance = (double) attrs [AttributeTypes.shieldExplosiveDamageResonance];
+        if (attrs.AttributeExists (AttributeTypes.shieldKineticDamageResonance))
+            bubble.ShieldKineticResonance = (double) attrs [AttributeTypes.shieldKineticDamageResonance];
+        if (attrs.AttributeExists (AttributeTypes.shieldThermalDamageResonance))
+            bubble.ShieldThermalResonance = (double) attrs [AttributeTypes.shieldThermalDamageResonance];
+
+        // NPC armor resistances
+        if (attrs.AttributeExists (AttributeTypes.armorEmDamageResonance))
+            bubble.ArmorEmResonance = (double) attrs [AttributeTypes.armorEmDamageResonance];
+        if (attrs.AttributeExists (AttributeTypes.armorExplosiveDamageResonance))
+            bubble.ArmorExplosiveResonance = (double) attrs [AttributeTypes.armorExplosiveDamageResonance];
+        if (attrs.AttributeExists (AttributeTypes.armorKineticDamageResonance))
+            bubble.ArmorKineticResonance = (double) attrs [AttributeTypes.armorKineticDamageResonance];
+        if (attrs.AttributeExists (AttributeTypes.armorThermalDamageResonance))
+            bubble.ArmorThermalResonance = (double) attrs [AttributeTypes.armorThermalDamageResonance];
+
+        // NPC signature radius
+        if (attrs.AttributeExists (AttributeTypes.signatureRadius))
+            bubble.SignatureRadius = (double) attrs [AttributeTypes.signatureRadius];
+
+        // Resolve faction from the NPC's owner corporation
+        if (bubble.OwnerID > 0 && bubble.FactionID == 0)
+        {
+            // Faction can be set explicitly via /entity deploy or from dungeon data
+        }
+
+        Log.Information ("[NpcAI] Params for {Name}: attackRange={AttackRange:F0}, orbitRange={OrbitRange:F0}, " +
+                         "chaseMax={ChaseMax:F0}, maxVel={MaxVel:F0}, faction={FactionID}, " +
+                         "dmg(em={EmDmg:F0},exp={ExpDmg:F0},kin={KinDmg:F0},therm={ThermDmg:F0}), " +
+                         "hp(shield={ShieldHP:F0},armor={ArmorHP:F0},hull={HullHP:F0})",
+            bubble.Name, bubble.AttackRange, bubble.OrbitRange,
+            bubble.ChaseMaxDistance, bubble.MaxVelocity, bubble.FactionID,
+            bubble.NpcEmDamage, bubble.NpcExplosiveDamage, bubble.NpcKineticDamage, bubble.NpcThermalDamage,
+            bubble.ShieldCapacity, bubble.ArmorHP, bubble.StructureHP);
     }
 
     /// <summary>
@@ -1281,5 +1439,437 @@ public slash
 
         Station target = this.Items.GetStaticStation (stationID);
         DoMoveToStation (call.Session.CharacterID, call.Session, target);
+    }
+
+    /// <summary>
+    /// /kill target - Destroy the target's ship.
+    /// If in a normal ship: ship is destroyed, player spawns in a capsule at the same position.
+    /// If in a capsule: pod killed, player respawns docked at clone station in a new capsule.
+    /// </summary>
+    private void KillCmd (string [] argv, ServiceCall call)
+    {
+        if (argv.Length < 2)
+            throw new SlashError ("Usage: /kill <target|me>");
+
+        int targetCharacterID = ResolveCharacterTarget (argv [1], call);
+
+        Session targetSession =
+            (targetCharacterID == call.Session.CharacterID)
+                ? call.Session
+                : this.SessionManager.FindSession ("charid", targetCharacterID).FirstOrDefault ();
+
+        if (targetSession == null)
+            throw new SlashError ("Target character is not online.");
+
+        int? solarSystemID = targetSession.SolarSystemID;
+
+        if (solarSystemID == null)
+            throw new SlashError ("Target character is not in space.");
+
+        int shipID = targetSession.ShipID ?? 0;
+
+        if (shipID == 0)
+            throw new SlashError ("Target character has no active ship.");
+
+        if (!this.SolarSystemDestinyMgr.TryGet (solarSystemID.Value, out DestinyManager dm))
+            throw new SlashError ("No destiny manager for the target's solar system.");
+
+        // Get ship position
+        double posX = 0, posY = 0, posZ = 0;
+
+        if (dm.TryGetEntity (shipID, out BubbleEntity shipBubble))
+        {
+            posX = shipBubble.Position.X;
+            posY = shipBubble.Position.Y;
+            posZ = shipBubble.Position.Z;
+        }
+
+        // Check if ship is a capsule
+        ItemEntity shipEntity = this.Items.LoadItem (shipID);
+
+        if (shipEntity == null)
+            throw new SlashError ($"Ship {shipID} not found.");
+
+        bool isCapsule = shipEntity.Type.ID == (int) TypeID.Capsule;
+
+        // Unregister ship from DestinyManager and broadcast RemoveBalls
+        dm.UnregisterEntity (shipID);
+
+        var removeEvents  = DestinyEventBuilder.BuildRemoveBalls (new[] { shipID });
+        var removeNotif   = DestinyEventBuilder.WrapAsNotification (removeEvents);
+
+        Notifications.SendNotification ("DoDestinyUpdate", "solarsystemid", solarSystemID.Value, removeNotif);
+
+        // Destroy the ship item
+        DogmaItems.DestroyItem (shipEntity);
+
+        Log.Information ("Slash /kill: destroyed ship {ShipID} (isCapsule={IsCapsule}) for char {CharID}",
+            shipID, isCapsule, targetCharacterID);
+
+        if (isCapsule)
+        {
+            // --- POD KILL: respawn at clone station ---
+            Character character = this.Items.LoadItem<Character> (targetCharacterID);
+
+            int cloneStationID = character.StationID;
+
+            if (character.ActiveCloneID != null && character.ActiveCloneID.Value != 0)
+            {
+                ItemEntity cloneItem = this.Items.LoadItem (character.ActiveCloneID.Value);
+
+                if (cloneItem != null && cloneItem.LocationID != 0)
+                    cloneStationID = cloneItem.LocationID;
+            }
+
+            Station station = this.Items.GetStaticStation (cloneStationID);
+
+            if (station == null)
+                throw new SlashError ($"Clone station {cloneStationID} not found.");
+
+            // Create capsule at clone station
+            ItemInventory capsule = DogmaItems.CreateItem<ItemInventory> (
+                character.Name + "'s Capsule", Types [TypeID.Capsule], targetCharacterID, cloneStationID, Flags.Hangar, 1, true
+            );
+
+            DogmaItems.MoveItem (character, capsule.ID, Flags.Pilot);
+
+            // Update character location in DB
+            this.CharacterDB.UpdateStationAndLocation (
+                targetCharacterID,
+                cloneStationID,
+                station.SolarSystemID,
+                station.ConstellationID,
+                station.RegionID
+            );
+
+            // Session change: dock at clone station
+            var delta = new Session ();
+
+            delta[Session.SHIP_ID]          = (PyInteger) capsule.ID;
+            delta[Session.STATION_ID]       = (PyInteger) cloneStationID;
+            delta[Session.LOCATION_ID]      = (PyInteger) cloneStationID;
+            delta[Session.SOLAR_SYSTEM_ID]  = new PyNone ();
+            delta[Session.SOLAR_SYSTEM_ID2] = (PyInteger) station.SolarSystemID;
+            delta[Session.CONSTELLATION_ID] = (PyInteger) station.ConstellationID;
+            delta[Session.REGION_ID]        = (PyInteger) station.RegionID;
+
+            SessionManager.PerformSessionUpdate (Session.CHAR_ID, targetCharacterID, delta);
+
+            Log.Information ("Slash /kill: pod kill -> char {CharID} respawned at station {StationID} in capsule {CapsuleID}",
+                targetCharacterID, cloneStationID, capsule.ID);
+        }
+        else
+        {
+            // --- SHIP DEATH: spawn capsule at ship's position ---
+            Character character = this.Items.LoadItem<Character> (targetCharacterID);
+
+            ItemInventory capsule = DogmaItems.CreateItem<ItemInventory> (
+                character.Name + "'s Capsule", Types [TypeID.Capsule], targetCharacterID, solarSystemID.Value, Flags.None, 1, true
+            );
+
+            capsule.X = posX;
+            capsule.Y = posY;
+            capsule.Z = posZ;
+            capsule.Persist ();
+
+            DogmaItems.MoveItem (character, capsule.ID, Flags.Pilot);
+
+            // Update session with new capsule
+            SessionManager.PerformSessionUpdate (Session.CHAR_ID, targetCharacterID, new Session { ShipID = capsule.ID });
+
+            // Register capsule in DestinyManager
+            var capsuleBubble = new BubbleEntity
+            {
+                ItemID        = capsule.ID,
+                TypeID        = (int) TypeID.Capsule,
+                GroupID       = (int) GroupID.Capsule,
+                CategoryID    = (int) CategoryID.Ship,
+                Name          = capsule.Name ?? character.Name + "'s Capsule",
+                OwnerID       = targetCharacterID,
+                CorporationID = targetSession.CorporationID,
+                AllianceID    = 0,
+                CharacterID   = targetCharacterID,
+                Position      = new Vector3 { X = posX, Y = posY, Z = posZ },
+                Velocity      = default,
+                Mode          = BallMode.Stop,
+                Flags         = BallFlag.IsFree | BallFlag.IsMassive | BallFlag.IsInteractive,
+                Radius        = 50.0,
+                Mass          = 32000.0,
+                MaxVelocity   = 150.0,
+                SpeedFraction = 0.0,
+                Agility       = 1.0
+            };
+
+            dm.RegisterEntity (capsuleBubble);
+
+            // Broadcast AddBalls for the capsule
+            int stamp          = DestinyEventBuilder.GetStamp ();
+            var addBallEvents  = DestinyEventBuilder.BuildAddBalls (new[] { capsuleBubble }, solarSystemID.Value, stamp);
+            var addBallNotif   = DestinyEventBuilder.WrapAsNotification (addBallEvents);
+
+            Notifications.SendNotification ("DoDestinyUpdate", "solarsystemid", solarSystemID.Value, addBallNotif);
+
+            Log.Information ("Slash /kill: ship death -> char {CharID} now in capsule {CapsuleID} at ({X:F0},{Y:F0},{Z:F0})",
+                targetCharacterID, capsule.ID, posX, posY, posZ);
+        }
+    }
+
+    /// <summary>
+    /// /dungeon - Dungeon management commands
+    /// </summary>
+    private void DungeonCmd (string [] argv, ServiceCall call)
+    {
+        if (argv.Length < 2)
+            throw new SlashError (
+                "Usage:\n" +
+                "  /dungeon list\n" +
+                "  /dungeon create <name> [archetypeID] [factionID]\n" +
+                "  /dungeon addroom <dungeonID> <roomName>\n" +
+                "  /dungeon addobject <roomID> <typeID> [x y z]\n" +
+                "  /dungeon play <dungeonID> [roomID]\n" +
+                "  /dungeon reset");
+
+        string sub = argv [1].ToLower ();
+
+        switch (sub)
+        {
+            case "list":
+            {
+                string msg = "Dungeons:\n";
+                foreach (var kvp in DungeonData.Dungeons)
+                {
+                    var d = kvp.Value;
+                    msg += $"  [{d.DungeonID}] {d.DungeonName} (archetype={d.ArchetypeID})\n";
+                    foreach (int rid in d.RoomIDs)
+                    {
+                        if (DungeonData.Rooms.TryGetValue (rid, out var room))
+                            msg += $"    Room [{room.RoomID}] {room.RoomName} ({room.ObjectIDs.Count} objects)\n";
+                    }
+                }
+                throw new SlashError (msg);
+            }
+
+            case "create":
+            {
+                if (argv.Length < 3)
+                    throw new SlashError ("Usage: /dungeon create <name> [archetypeID] [factionID]");
+
+                string name = argv [2];
+                int archetypeID = argv.Length > 3 ? int.Parse (argv [3]) : 1;
+                int factionID = argv.Length > 4 ? int.Parse (argv [4]) : 0;
+
+                int newID = DungeonData.NextDungeonID ();
+                DungeonData.Dungeons [newID] = new DungeonDefinition
+                {
+                    DungeonID = newID,
+                    DungeonName = name,
+                    ArchetypeID = archetypeID,
+                    FactionID = factionID
+                };
+
+                Log.Information ("Slash /dungeon create: created dungeon {ID} '{Name}'", newID, name);
+                throw new SlashError ($"Created dungeon [{newID}] {name}");
+            }
+
+            case "addroom":
+            {
+                if (argv.Length < 4)
+                    throw new SlashError ("Usage: /dungeon addroom <dungeonID> <roomName>");
+
+                int dungeonID = int.Parse (argv [2]);
+                string roomName = argv [3];
+
+                if (!DungeonData.Dungeons.TryGetValue (dungeonID, out var dung))
+                    throw new SlashError ($"Dungeon {dungeonID} not found");
+
+                int newRoomID = DungeonData.NextRoomID ();
+                DungeonData.Rooms [newRoomID] = new RoomDefinition
+                {
+                    RoomID = newRoomID,
+                    DungeonID = dungeonID,
+                    RoomName = roomName,
+                    ShortName = roomName
+                };
+                dung.RoomIDs.Add (newRoomID);
+
+                Log.Information ("Slash /dungeon addroom: added room {RoomID} '{Name}' to dungeon {DungeonID}", newRoomID, roomName, dungeonID);
+                throw new SlashError ($"Added room [{newRoomID}] {roomName} to dungeon [{dungeonID}] {dung.DungeonName}");
+            }
+
+            case "addobject":
+            {
+                if (argv.Length < 4)
+                    throw new SlashError ("Usage: /dungeon addobject <roomID> <typeID> [x y z]");
+
+                int roomID = int.Parse (argv [2]);
+                int typeID = int.Parse (argv [3]);
+
+                if (!DungeonData.Rooms.TryGetValue (roomID, out var room))
+                    throw new SlashError ($"Room {roomID} not found");
+                if (!Types.ContainsKey (typeID))
+                    throw new SlashError ($"TypeID {typeID} not found");
+
+                double ox = argv.Length > 4 ? double.Parse (argv [4]) : 0;
+                double oy = argv.Length > 5 ? double.Parse (argv [5]) : 0;
+                double oz = argv.Length > 6 ? double.Parse (argv [6]) : 0;
+
+                int newObjID = DungeonData.NextObjectID ();
+                DungeonData.Objects [newObjID] = new DungeonObject
+                {
+                    ObjectID = newObjID,
+                    RoomID = roomID,
+                    ObjectName = Types [typeID].Name,
+                    TypeID = typeID,
+                    X = ox, Y = oy, Z = oz,
+                    Radius = Types [typeID].Radius
+                };
+                room.ObjectIDs.Add (newObjID);
+
+                Log.Information ("Slash /dungeon addobject: added object {ObjID} type={TypeID} to room {RoomID}", newObjID, typeID, roomID);
+                throw new SlashError ($"Added [{newObjID}] {Types [typeID].Name} to room [{roomID}] {room.RoomName} at ({ox},{oy},{oz})");
+            }
+
+            case "play":
+            {
+                if (argv.Length < 3)
+                    throw new SlashError ("Usage: /dungeon play <dungeonID> [roomID]");
+
+                int dungeonID = int.Parse (argv [2]);
+                if (!DungeonData.Dungeons.TryGetValue (dungeonID, out var dung))
+                    throw new SlashError ($"Dungeon {dungeonID} not found");
+
+                int roomID = 0;
+                if (argv.Length > 3)
+                    roomID = int.Parse (argv [3]);
+                else if (dung.RoomIDs.Count > 0)
+                    roomID = dung.RoomIDs [0];
+
+                if (!DungeonData.Rooms.TryGetValue (roomID, out var room))
+                    throw new SlashError ($"Room {roomID} not found. Use /dungeon list to see room IDs.");
+
+                int solarSystemID = call.Session.EnsureCharacterIsInSpace ();
+                int shipID = call.Session.ShipID ?? 0;
+                double baseX = 0, baseY = 0, baseZ = 0;
+
+                if (shipID != 0 && SolarSystemDestinyMgr.TryGet (solarSystemID, out DestinyManager dm) &&
+                    dm.TryGetEntity (shipID, out BubbleEntity shipEnt))
+                {
+                    baseX = shipEnt.Position.X;
+                    baseY = shipEnt.Position.Y;
+                    baseZ = shipEnt.Position.Z;
+                }
+
+                var spawnedList = DungeonData.SpawnedEntities.GetOrAdd (
+                    call.Session.CharacterID, _ => new System.Collections.Generic.List<int> ());
+                var spawnedBubbles = new System.Collections.Generic.List<BubbleEntity> ();
+
+                foreach (int objID in room.ObjectIDs)
+                {
+                    if (!DungeonData.Objects.TryGetValue (objID, out var obj))
+                        continue;
+                    if (!Types.ContainsKey (obj.TypeID))
+                        continue;
+
+                    Type type = Types [obj.TypeID];
+                    double x = baseX + obj.X;
+                    double y = baseY + obj.Y;
+                    double z = baseZ + obj.Z;
+
+                    ItemEntity newItem = DogmaItems.CreateItem<ItemEntity> (
+                        type, call.Session.CharacterID, solarSystemID, Flags.None, 1, true);
+                    newItem.X = x;
+                    newItem.Y = y;
+                    newItem.Z = z;
+                    newItem.Persist ();
+
+                    if (SolarSystemDestinyMgr.TryGet (solarSystemID, out DestinyManager destinyMgr))
+                    {
+                        var bubble = new BubbleEntity
+                        {
+                            ItemID = newItem.ID,
+                            TypeID = type.ID,
+                            GroupID = type.Group.ID,
+                            CategoryID = type.Group.Category.ID,
+                            Name = obj.ObjectName ?? type.Name,
+                            OwnerID = call.Session.CharacterID,
+                            CorporationID = call.Session.CorporationID,
+                            AllianceID = 0,
+                            CharacterID = 0,
+                            Position = new Vector3 { X = x, Y = y, Z = z },
+                            Velocity = default,
+                            Mode = BallMode.Rigid,
+                            Flags = BallFlag.IsGlobal | BallFlag.IsMassive | BallFlag.IsInteractive,
+                            Radius = obj.Radius > 0 ? obj.Radius : type.Radius,
+                            Mass = 1000000.0,
+                            MaxVelocity = 0.0,
+                            SpeedFraction = 0.0,
+                            Agility = 1.0
+                        };
+                        destinyMgr.RegisterEntity (bubble);
+                        spawnedBubbles.Add (bubble);
+                    }
+
+                    spawnedList.Add (newItem.ID);
+                }
+
+                // Send AddBalls to the deploying player via "charid"
+                if (spawnedBubbles.Count > 0)
+                {
+                    int charID = call.Session.CharacterID;
+                    int stamp = DestinyEventBuilder.GetStamp ();
+                    var addBallEvents = DestinyEventBuilder.BuildAddBalls (spawnedBubbles, solarSystemID, stamp);
+                    var notification  = DestinyEventBuilder.WrapAsNotification (addBallEvents);
+                    Notifications.SendNotification ("DoDestinyUpdate", "charid", charID, notification);
+                }
+
+                Log.Information ("Slash /dungeon play: spawned {Count} objects from dungeon {DungeonID} room {RoomID}",
+                    room.ObjectIDs.Count, dungeonID, roomID);
+                break;
+            }
+
+            case "reset":
+            {
+                int charID = call.Session.CharacterID;
+                if (!DungeonData.SpawnedEntities.TryGetValue (charID, out var spawnedList))
+                    throw new SlashError ("No spawned dungeon entities to reset");
+
+                int solarSystemID = call.Session.EnsureCharacterIsInSpace ();
+                var removedIDs = new System.Collections.Generic.List<int> ();
+
+                foreach (int itemID in spawnedList.ToArray ())
+                {
+                    if (SolarSystemDestinyMgr.TryGet (solarSystemID, out DestinyManager dm))
+                        dm.UnregisterEntity (itemID);
+
+                    if (Items.TryGetItem (itemID, out ItemEntity item))
+                        DogmaItems.DestroyItem (item);
+
+                    removedIDs.Add (itemID);
+                }
+
+                spawnedList.Clear ();
+
+                // Broadcast RemoveBalls so clients remove them from the scene
+                if (removedIDs.Count > 0)
+                {
+                    var removeEvents = DestinyEventBuilder.BuildRemoveBalls (removedIDs);
+                    var notification = DestinyEventBuilder.WrapAsNotification (removeEvents);
+                    Notifications.SendNotification ("DoDestinyUpdate", "solarsystemid", solarSystemID, notification);
+                }
+
+                Log.Information ("Slash /dungeon reset: destroyed {Count} entities for char {CharID}", removedIDs.Count, charID);
+                break;
+            }
+
+            default:
+                throw new SlashError (
+                    "Usage:\n" +
+                    "  /dungeon list\n" +
+                    "  /dungeon create <name> [archetypeID] [factionID]\n" +
+                    "  /dungeon addroom <dungeonID> <roomName>\n" +
+                    "  /dungeon addobject <roomID> <typeID> [x y z]\n" +
+                    "  /dungeon play <dungeonID> [roomID]\n" +
+                    "  /dungeon reset");
+        }
     }
 }

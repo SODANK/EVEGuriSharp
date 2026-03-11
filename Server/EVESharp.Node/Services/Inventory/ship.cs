@@ -79,7 +79,7 @@ public class ship : ClientBoundService
     {
         int callerCharacterID = call.Session.CharacterID;
 
-        Character character = this.Items.GetItem<Character>(callerCharacterID);
+        Character character = this.Items.LoadItem<Character>(callerCharacterID);
         ItemInventory capsule = DogmaItems.CreateItem<ItemInventory>(
             character.Name + "'s Capsule", Types[TypeID.Capsule], character.ID, Location.ID, Flags.Hangar, 1, true
         );
@@ -96,8 +96,8 @@ public class ship : ClientBoundService
         if (this.Items.TryGetItem(itemID, out Ship newShip) == false)
             throw new CustomError("Ships not loaded for player and hangar!");
 
-        Character character = this.Items.GetItem<Character>(callerCharacterID);
-        Ship currentShip = this.Items.GetItem<Ship>((int)call.Session.ShipID);
+        Character character = this.Items.LoadItem<Character>(callerCharacterID);
+        Ship currentShip = this.Items.LoadItem<Ship>((int)call.Session.ShipID);
 
         if (newShip.Singleton == false)
             throw new CustomError("TooFewSubSystemsToUndock");
@@ -106,7 +106,7 @@ public class ship : ClientBoundService
         newShip.CheckPrerequisites(character);
 
         DogmaItems.MoveItem(character, newShip.ID, Flags.Pilot);
-        SessionManager.PerformSessionUpdate(Session.CHAR_ID, callerCharacterID, new Session { ShipID = newShip.ID });
+        SessionManager.PerformSessionUpdate(Session.CHAR_ID, callerCharacterID, new Session { ShipID = newShip.ID, ShipTypeID = newShip.Type.ID });
 
         if (currentShip.Type.ID == (int)TypeID.Capsule)
             DogmaItems.DestroyItem(currentShip);

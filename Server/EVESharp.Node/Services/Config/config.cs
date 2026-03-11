@@ -25,7 +25,20 @@ public class config : Service
 
     public PyDataType GetMultiOwnersEx (ServiceCall call, PyList ids)
     {
-        return DB.GetMultiOwnersEx (ids.GetEnumerable <PyInteger> ());
+        Log.Information("[config] GetMultiOwnersEx called with {Count} IDs", ids.Count);
+        var result = DB.GetMultiOwnersEx (ids.GetEnumerable <PyInteger> ());
+
+        if (result is PyTuple tuple && tuple.Count >= 2 && tuple[1] is PyList rows)
+        {
+            Log.Information("[config] GetMultiOwnersEx returning {RowCount} owner rows", rows.Count);
+            foreach (PyList row in rows)
+            {
+                if (row.Count >= 2)
+                    Log.Information("[config]   Owner: id={OwnerID}, name={OwnerName}", row[0], row[1]);
+            }
+        }
+
+        return result;
     }
 
     public PyDataType GetMultiGraphicsEx (ServiceCall call, PyList ids)
@@ -35,7 +48,21 @@ public class config : Service
 
     public PyDataType GetMultiLocationsEx (ServiceCall call, PyList ids)
     {
-        return DB.GetMultiLocationsEx (ids.GetEnumerable <PyInteger> ());
+        Log.Information("[config] GetMultiLocationsEx called with {Count} IDs", ids.Count);
+        var result = DB.GetMultiLocationsEx (ids.GetEnumerable <PyInteger> ());
+
+        // Log the response structure
+        if (result is PyTuple tuple && tuple.Count >= 2 && tuple[1] is PyList rows)
+        {
+            Log.Information("[config] GetMultiLocationsEx returning {RowCount} location rows", rows.Count);
+            foreach (PyList row in rows)
+            {
+                if (row.Count >= 2)
+                    Log.Information("[config]   Location: id={LocationID}, name={LocationName}", row[0], row[1]);
+            }
+        }
+
+        return result;
     }
 
     public PyDataType GetMultiAllianceShortNamesEx (ServiceCall call, PyList ids)

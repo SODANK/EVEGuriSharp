@@ -3,6 +3,7 @@ using EVESharp.EVE.Network.Services;
 using EVESharp.EVE.Sessions;
 using EVESharp.Types;
 using EVESharp.Types.Collections;
+using EVESharp.EVE.Data.Inventory;
 using EVESharp.EVE.Data.Inventory.Items;
 using EVESharp.EVE.Network.Services.Validators;
 
@@ -14,17 +15,21 @@ namespace EVESharp.Node.Services.Inventory
     {
         public override AccessLevel AccessLevel => AccessLevel.None;
 
+        private IItems Items { get; }
+
         // Global constructor
-        public shipSvc(IBoundServiceManager manager)
+        public shipSvc(IItems items, IBoundServiceManager manager)
             : base(manager)
         {
+            Items = items;
             Console.WriteLine("[shipSvc] Global service constructed");
         }
 
         // Bound constructor
-        public shipSvc(IBoundServiceManager manager, Session session, int shipID)
+        public shipSvc(IItems items, IBoundServiceManager manager, Session session, int shipID)
             : base(manager, session, shipID)
         {
+            Items = items;
             Console.WriteLine(
                 $"[shipSvc] Bound instance created for char={session.CharacterID}, shipID={shipID}");
         }
@@ -41,7 +46,7 @@ namespace EVESharp.Node.Services.Inventory
         {
             Console.WriteLine($"[shipSvc] CreateBoundInstance for shipID={bindParams.ObjectID}");
 
-            var instance = new shipSvc(BoundServiceManager, call.Session, bindParams.ObjectID);
+            var instance = new shipSvc(Items, BoundServiceManager, call.Session, bindParams.ObjectID);
             return instance;
         }
 
@@ -109,22 +114,31 @@ namespace EVESharp.Node.Services.Inventory
         {
             Console.WriteLine("[shipSvc] Client disconnected from ship bound object.");
         }
-private int GetShipTypeID(ServiceCall call)
-{
-    try
-    {
-        // Many Apoc builds use this hidden session variable
-        var typeID = call.Session["shipTypeID"] as PyInteger;
-        if (typeID != null)
-            return (int)typeID.Value;
-    }
-    catch 
-    {
-        // ignore
-    }
+        private int GetShipTypeID(ServiceCall call)
+        {
+            // Try the session variable first
+            int? typeID = call.Session.ShipTypeID;
+            if (typeID != null && typeID.Value != 0)
+                return typeID.Value;
 
-    return 0;
-}
+            // Fallback: load the ship item directly
+            int shipID = call.Session.ShipID ?? 0;
+            if (shipID != 0)
+            {
+                try
+                {
+                    var shipItem = Items.GetItem(shipID);
+                    if (shipItem?.Type != null)
+                        return shipItem.Type.ID;
+                }
+                catch
+                {
+                    // item not loadable
+                }
+            }
+
+            return 0;
+        }
 
   }
 }

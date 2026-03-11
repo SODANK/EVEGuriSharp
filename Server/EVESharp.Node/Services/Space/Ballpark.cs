@@ -49,5 +49,10 @@ namespace EVESharp.Node.Services.Space
         {
             return mEntities.TryGetValue(itemID, out ent);
         }
+
+        public bool RemoveEntity(int itemID)
+        {
+            return mEntities.Remove(itemID);
+        }
     }
 }

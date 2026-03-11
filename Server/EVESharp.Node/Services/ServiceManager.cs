@@ -108,7 +108,11 @@ public class ServiceManager : IServiceManager<string>
     public beyonce beyonce { get; }
     public SpaceServiceRegistrar spaceReg { get; }
     public michelle michelle { get; }
-
+    public dungeon dungeon { get; }
+    public keeper keeper { get; }
+    public dungeonExplorationMgr dungeonExplorationMgr { get; }
+    public scanMgr scanMgr { get; }
+    public fittingSvc fittingSvc { get; }
 
 
 
@@ -172,11 +176,13 @@ public class ServiceManager : IServiceManager<string>
         allianceRegistry allianceRegistry,
         beyonce beyonce,
         SpaceServiceRegistrar spaceReg,
-        michelle michelle
-
-
+        michelle michelle,
+        dungeon dungeon,
+        keeper keeper,
+        dungeonExplorationMgr dungeonExplorationMgr,
+        scanMgr scanMgr,
+        fittingSvc fittingSvc
     )
-
     {
         CacheStorage = storage;
         Timers = timers;
@@ -232,8 +238,11 @@ public class ServiceManager : IServiceManager<string>
         this.beyonce = beyonce;
         this.spaceReg = spaceReg;
         this.michelle = michelle;
-       
-
+        this.dungeon = dungeon;
+        this.keeper = keeper;
+        this.dungeonExplorationMgr = dungeonExplorationMgr;
+        this.scanMgr = scanMgr;
+        this.fittingSvc = fittingSvc;
 
     }
 

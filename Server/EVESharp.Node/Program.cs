@@ -213,6 +213,11 @@ namespace EVESharp.Node
             container.Register<beyonce>(Lifestyle.Singleton);
             container.Register<DestinyBroadcaster>(Lifestyle.Singleton);
             container.Register<SolarSystemDestinyManager>(Lifestyle.Singleton);
+            container.Register<Services.Dogma.TargetManager>(Lifestyle.Singleton);
+            container.Register<Services.Combat.PlayerDeathHandler>(Lifestyle.Singleton);
+            container.Register<Services.Combat.CombatService>(Lifestyle.Singleton);
+            container.Register<Services.Combat.WeaponCycler>(Lifestyle.Singleton);
+            container.Register<Services.Combat.MissileManager>(Lifestyle.Singleton);
 
             // register logging system
             container.RegisterInstance(baseLogger);
@@ -326,6 +331,12 @@ namespace EVESharp.Node
             container.Register<SpaceServiceRegistrar>(Lifestyle.Singleton);
             // ballparkSvc removed — beyonce is the single consolidated ballpark service
             container.Register<michelle>(Lifestyle.Singleton);
+            container.Register<DungeonData>(Lifestyle.Singleton);
+            container.Register<dungeon>(Lifestyle.Singleton);
+            container.Register<keeper>(Lifestyle.Singleton);
+            container.Register<dungeonExplorationMgr>(Lifestyle.Singleton);
+            container.Register<scanMgr>(Lifestyle.Singleton);
+            container.Register<fittingSvc>(Lifestyle.Singleton);
 
             // depending on the server mode initialize a different macho instance
             switch (configuration.MachoNet.Mode)
@@ -402,10 +413,34 @@ namespace EVESharp.Node
 
                     log.Verbose("Node startup done");
 
-                    // idle for infinity
-                    // yes, i know this is not ideal, but there's actual work that needs to happen
-                    // before this can be properly rewritten
-                    Thread.Sleep(Timeout.Infinite);
+                    // wait for shutdown signal (Ctrl+C or process termination)
+                    using ManualResetEventSlim shutdownEvent = new ManualResetEventSlim (false);
+
+                    Console.CancelKeyPress += (_, e) =>
+                    {
+                        e.Cancel = true;
+                        log.Information ("Shutdown signal received (Ctrl+C), shutting down...");
+                        shutdownEvent.Set ();
+                    };
+
+                    AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+                    {
+                        log.Information ("Process exit signal received, shutting down...");
+                        shutdownEvent.Set ();
+                    };
+
+                    shutdownEvent.Wait ();
+
+                    // graceful cleanup
+                    log.Information ("Closing server transport...");
+                    machoNet.TransportManager.ServerTransport?.Close ();
+
+                    log.Information ("Closing client connections...");
+
+                    foreach (IMachoTransport transport in machoNet.TransportManager.TransportList)
+                        transport.Close ();
+
+                    log.Information ("Server shutdown complete.");
                 }
                 catch (Exception e)
                 {

@@ -536,6 +536,22 @@ public class character : Service
         updates.ShipID          = character.LocationID;
         updates.RaceID          = Ancestries [character.AncestryID].Bloodline.RaceID;
 
+        // Load the ship item to set shipTypeID in the session
+        Console.WriteLine ($"[character] SelectCharacterID: charID={characterID} LocationID={character.LocationID} (ShipID) StationID={character.StationID} SolarSystemID={character.SolarSystemID}");
+        Console.WriteLine ($"[character]   CharTypeID={character.Type.ID} ({character.Type.Name})");
+        try
+        {
+            var shipItem = this.Items.GetItem (character.LocationID);
+            Console.WriteLine ($"[character]   ShipItem: exists={shipItem != null} typeID={shipItem?.Type?.ID} typeName={shipItem?.Type?.Name} locationID={shipItem?.LocationID}");
+
+            if (shipItem?.Type != null)
+                updates.ShipTypeID = shipItem.Type.ID;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine ($"[character]   ShipItem: FAILED to load itemID={character.LocationID}: {ex.Message}");
+        }
+
         // check if the character has any accounting roles and set the correct accountKey based on the data
         if (this.Wallets.IsAccessAllowed (updates, character.CorpAccountKey, updates.CorporationID))
             updates.CorpAccountKey = character.CorpAccountKey;

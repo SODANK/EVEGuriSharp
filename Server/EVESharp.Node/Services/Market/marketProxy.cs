@@ -501,7 +501,7 @@ if (splitQty > 0)
     MarketOrder[] orders = DB.FindMatchingOrders(dbLock, price, typeID, character.ID, solarSystemID, TransactionType.Sell);
 
     // ensure there's at least some that match
-    this.CheckMatchingSellOrders(orders, quantity, solarSystemID);
+    this.CheckMatchingSellOrders(orders, quantity, stationID);
 
     foreach (MarketOrder order in orders)
     {

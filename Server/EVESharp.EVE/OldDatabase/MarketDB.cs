@@ -343,11 +343,11 @@ public class MarketDB : DatabaseAccessor
                         reader.GetInt32 (6),
                         reader.GetInt32 (7),
                         reader.GetInt32 (8),
-                        reader.GetInt32 (9),
-                        reader.IsDBNull (10) == false ? reader.GetDouble (10) : 0,
+                        reader.IsDBNull (9) ? 0 : reader.GetInt32 (9),
+                        reader.IsDBNull (10) ? 0 : reader.GetDouble (10),
                         type,
                         reader.GetInt64 (11),
-                        reader.GetInt32 (12),
+                        reader.IsDBNull (12) ? 0 : reader.GetInt32 (12),
                         reader.GetBoolean (13)
                     )
                 );

@@ -413,7 +413,23 @@ public class Items : IItems
 
     private ItemEntity LoadBlueprint (Item item)
     {
-        return new Blueprint (Database.InvBpLoad (item));
+        var info = Database.InvBpLoad (item);
+
+        if (info is null)
+        {
+            info = new Database.Inventory.Types.Information.Blueprint
+            {
+                Information                     = item,
+                IsCopy                          = false,
+                MaterialLevel                   = 0,
+                ProductivityLevel               = 0,
+                LicensedProductionRunsRemaining = -1
+            };
+
+            Database.InvBpCreate (info);
+        }
+
+        return new Blueprint (info);
     }
 
     private ItemEntity LoadOwner (Item item)

@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using EVESharp.Database.Old;
+using EVESharp.EVE.Data.Inventory;
+using EVESharp.Node.Services.Combat;
 
 namespace EVESharp.Node.Services.Space
 {
@@ -12,10 +15,18 @@ namespace EVESharp.Node.Services.Space
         private readonly ConcurrentDictionary<int, DestinyManager> mManagers = new ConcurrentDictionary<int, DestinyManager>();
         private readonly ConcurrentDictionary<int, int> mUndockStations = new ConcurrentDictionary<int, int>();
         private readonly DestinyBroadcaster mBroadcaster;
+        private readonly StandingDB         mStandingDB;
+        private readonly CombatService      mCombat;
+        private readonly MissileManager     mMissileManager;
+        private readonly IItems             mItems;
 
-        public SolarSystemDestinyManager(DestinyBroadcaster broadcaster)
+        public SolarSystemDestinyManager(DestinyBroadcaster broadcaster, StandingDB standingDB, CombatService combatService, MissileManager missileManager, IItems items)
         {
-            mBroadcaster = broadcaster;
+            mBroadcaster    = broadcaster;
+            mStandingDB     = standingDB;
+            mCombat         = combatService;
+            mMissileManager = missileManager;
+            mItems          = items;
         }
 
         /// <summary>
@@ -26,7 +37,7 @@ namespace EVESharp.Node.Services.Space
             return mManagers.GetOrAdd(solarSystemID, id =>
             {
                 Console.WriteLine($"[SolarSystemDestinyManager] Creating DestinyManager for system {id}");
-                return new DestinyManager(id, mBroadcaster);
+                return new DestinyManager(id, mBroadcaster, mStandingDB, mCombat, mMissileManager, mItems);
             });
         }
 

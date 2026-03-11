@@ -2,16 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using EVESharp.Database;
+using EVESharp.Database.Dogma;
 using EVESharp.Database.Inventory;
+using EVESharp.Database.Inventory.Attributes;
+using EVESharp.Database.Inventory.Categories;
 using EVESharp.Database.Inventory.Groups;
+using EVESharp.Database.Inventory.Types;
 using EVESharp.Database.Types;
 using EVESharp.Destiny;
 using EVESharp.EVE.Data.Inventory;
 using EVESharp.EVE.Data.Inventory.Items;
 using EVESharp.EVE.Data.Inventory.Items.Types;
+using EVESharp.EVE.Dogma;
 using EVESharp.EVE.Network.Services;
 using EVESharp.EVE.Notifications;
 using EVESharp.EVE.Sessions;
+using EVESharp.Node.Services.Dogma;
 using EVESharp.Types;
 using EVESharp.Types.Collections;
 using Serilog;
@@ -23,19 +29,20 @@ namespace EVESharp.Node.Services.Space
     ///
     /// CLIENT FLOW (from decompiled michelle.py / eveMoniker.py):
     ///   1. ship.Undock() sends session change (stationid=None, solarsystemid=X)
-    ///      + ship.Undock() also sends DoDestinyUpdate notification (PRIMARY delivery)
     ///   2. Client gameui.OnSessionChanged → GoInflight → michelle.AddBallpark(ssid)
     ///   3. AddBallpark creates native destiny.Ballpark, then:
     ///      a. Park.__init__() calls moniker.GetBallPark(ssid) → Moniker('beyonce', ssid)
     ///      b. remoteBallpark.Bind() → MachoBindObject → SERVER creates BOUND beyonce instance
-    ///         (BACKUP: bound constructor also sends DoDestinyUpdate)
+    ///         → bound constructor sends DoDestinyUpdate (targeted to this character only)
     ///      c. eve.RemoteSvc('beyonce').GetFormations() → calls GLOBAL service (just returns formations)
     ///      d. __bp.LoadFormations(formations)
     ///      e. __bp.Start() → starts tick loop, processes queued DoDestinyUpdate
     ///   4. Park.SetState(bag) → reads destiny binary → creates balls → DoBallsAdded → 3D render
     ///
-    /// NOTE: DoDestinyUpdate is sent from ship.Undock() as the primary delivery mechanism.
-    ///       The bound constructor also sends it as a backup if the client binds the moniker.
+    /// IMPORTANT: The initial SetState must be sent via "charid" (character-targeted), NOT via
+    /// "solarsystemid2" (system broadcast). System broadcasts would replace every client's ballpark
+    /// in the solar system with this player's ego/state. Incremental updates (movement commands)
+    /// are broadcast system-wide via DestinyBroadcaster, which is correct.
     /// </summary>
     [ConcreteService("beyonce")]
     public class beyonce : ClientBoundService
@@ -43,11 +50,15 @@ namespace EVESharp.Node.Services.Space
         public override AccessLevel AccessLevel => AccessLevel.None;
 
         private IItems                     Items                     { get; }
+        private ITypes                     Types                     => Items.Types;
+        private IDogmaItems                DogmaItems                { get; }
         private INotificationSender        NotificationSender        { get; }
         private SolarSystemDestinyManager  SolarSystemDestinyMgr     { get; }
         private ISessionManager            SessionManager            { get; }
         private IDatabase                  Database                  { get; }
         private ILogger                    Log                       { get; }
+        private TargetManager              TargetMgr                 { get; }
+        private DestinyBroadcaster         Broadcaster               { get; }
 
         private Ballpark        mBallpark;
         private DestinyManager  mDestinyManager;
@@ -60,16 +71,20 @@ namespace EVESharp.Node.Services.Space
         //  Called once at startup. No ballpark here.
         // =====================================================================
 
-        public beyonce(IBoundServiceManager manager, IItems items, INotificationSender notificationSender,
-                       SolarSystemDestinyManager solarSystemDestinyMgr, ISessionManager sessionManager, IDatabase database, ILogger logger)
+        public beyonce(IBoundServiceManager manager, IItems items, IDogmaItems dogmaItems, INotificationSender notificationSender,
+                       SolarSystemDestinyManager solarSystemDestinyMgr, ISessionManager sessionManager, IDatabase database, ILogger logger,
+                       TargetManager targetManager, DestinyBroadcaster broadcaster)
             : base(manager)
         {
             this.Items                 = items;
+            this.DogmaItems            = dogmaItems;
             this.NotificationSender    = notificationSender;
             this.SolarSystemDestinyMgr = solarSystemDestinyMgr;
             this.SessionManager        = sessionManager;
             this.Database              = database;
             this.Log                   = logger;
+            this.TargetMgr             = targetManager;
+            this.Broadcaster           = broadcaster;
         }
 
         // =====================================================================
@@ -82,19 +97,25 @@ namespace EVESharp.Node.Services.Space
             Session                    session,
             int                        objectID,
             IItems                     items,
+            IDogmaItems                dogmaItems,
             INotificationSender        notificationSender,
             SolarSystemDestinyManager  solarSystemDestinyMgr,
             ISessionManager            sessionManager,
             IDatabase                  database,
-            ILogger                    logger)
+            ILogger                    logger,
+            TargetManager              targetManager,
+            DestinyBroadcaster         broadcaster)
             : base(manager, session, objectID)
         {
             this.Items                 = items;
+            this.DogmaItems            = dogmaItems;
             this.NotificationSender    = notificationSender;
             this.SolarSystemDestinyMgr = solarSystemDestinyMgr;
             this.SessionManager        = sessionManager;
             this.Database              = database;
             this.Log                   = logger;
+            this.TargetMgr             = targetManager;
+            this.Broadcaster           = broadcaster;
             this.mSolarSystemID        = objectID;
             this.mOwnerID              = session.CharacterID;
 
@@ -168,12 +189,64 @@ namespace EVESharp.Node.Services.Space
             LoadCelestials(mSolarSystemID);
 
             // ----------------------------------------------------------
+            // Include all dynamic entities from DestinyManager
+            // (other players' ships, spawned NPCs, etc.)
+            // ----------------------------------------------------------
+            foreach (var existingEntity in mDestinyManager.GetEntities())
+            {
+                if (existingEntity.ItemID == shipID)
+                    continue;
+                if (mBallpark.Entities.ContainsKey(existingEntity.ItemID))
+                    continue;
+
+                ItemEntity entity = Items.LoadItem(existingEntity.ItemID);
+                if (entity != null)
+                {
+                    mBallpark.AddEntity(entity);
+                    Log.Information("[beyonce] Added dynamic entity {EntityID} (type={TypeID}, player={IsPlayer}) to ballpark",
+                        existingEntity.ItemID, existingEntity.TypeID, existingEntity.IsPlayer);
+                }
+            }
+
+            // ----------------------------------------------------------
             // SEND DoDestinyUpdate IMMEDIATELY
             // The client's Park.__init__() queues events in self.history,
             // and DoPreTick (called each tick after Start()) processes them.
             // No artificial delay needed — the queuing mechanism handles timing.
             // ----------------------------------------------------------
             SendDoDestinyUpdate(session);
+
+            // ----------------------------------------------------------
+            // Broadcast AddBalls to existing players so they see us
+            // ----------------------------------------------------------
+            if (shipEntity != null && mDestinyManager.TryGetEntity(shipID, out var selfBubble))
+            {
+                // Use the same stamp computation as BuildSnapshot for consistency
+                int addBallStamp = GetStamp();
+
+                Log.Information("[beyonce] AddBalls: entity itemID={ItemID}, mode={Mode}, flags={Flags}, pos=({X:F0},{Y:F0},{Z:F0}), vel=({VX:F0},{VY:F0},{VZ:F0}), speed={Speed}",
+                    selfBubble.ItemID, selfBubble.Mode, selfBubble.Flags,
+                    selfBubble.Position.X, selfBubble.Position.Y, selfBubble.Position.Z,
+                    selfBubble.Velocity.X, selfBubble.Velocity.Y, selfBubble.Velocity.Z,
+                    selfBubble.SpeedFraction);
+
+                var addBallEvents = DestinyEventBuilder.BuildAddBalls(
+                    new[] { selfBubble }, mSolarSystemID, addBallStamp);
+
+                // Add modules to the slim for 3D hardpoint rendering
+                AddModulesToAddBallSlims(addBallEvents, shipID);
+
+                var notification = DestinyEventBuilder.WrapAsNotification(addBallEvents);
+
+                NotificationSender.SendNotification(
+                    "DoDestinyUpdate",
+                    "solarsystemid",
+                    mSolarSystemID,
+                    notification
+                );
+
+                Log.Information("[beyonce] Broadcast AddBalls for ship {ShipID} to system {SystemID} stamp={Stamp}", shipID, mSolarSystemID, addBallStamp);
+            }
         }
 
         // =====================================================================
@@ -189,12 +262,22 @@ namespace EVESharp.Node.Services.Space
         {
             Log.Information("[beyonce] CreateBoundInstance: objectID={ObjectID}, char={CharID}", bindParams.ObjectID, call.Session.CharacterID);
             return new beyonce(BoundServiceManager, call.Session, bindParams.ObjectID,
-                               this.Items, this.NotificationSender, this.SolarSystemDestinyMgr, this.SessionManager, this.Database, this.Log);
+                               this.Items, this.DogmaItems, this.NotificationSender, this.SolarSystemDestinyMgr, this.SessionManager, this.Database, this.Log,
+                               this.TargetMgr, this.Broadcaster);
         }
 
         // =====================================================================
         //  CLIENT API
         // =====================================================================
+
+        /// <summary>
+        /// GetJumpQueueStatus - Called by the client to check if there's a queue to enter the system.
+        /// Returns None to indicate no queue.
+        /// </summary>
+        public PyDataType GetJumpQueueStatus(ServiceCall call)
+        {
+            return new PyNone();
+        }
 
         /// <summary>
         /// GetFormations - Called by the client on the GLOBAL service via eve.RemoteSvc('beyonce').
@@ -246,9 +329,10 @@ namespace EVESharp.Node.Services.Space
         /// </summary>
         public PyDataType TeardownBallpark(ServiceCall call)
         {
-            Log.Information("[beyonce] TeardownBallpark()");
             int shipID = call.Session.ShipID ?? 0;
+            Log.Information("[beyonce] TeardownBallpark: ship={ShipID}", shipID);
             mDestinyManager?.UnregisterEntity(shipID);
+            BroadcastRemoveBalls(shipID);
             mBallpark = null;
             return new PyNone();
         }
@@ -301,6 +385,41 @@ namespace EVESharp.Node.Services.Space
             return new PyNone();
         }
 
+        /// <summary>
+        /// GetRelativity - Called periodically by the client to verify its position matches the server.
+        /// Returns (diff, x, y, z, sTime, tTime, rTime) where diff = distance delta from predicted position.
+        /// </summary>
+        public PyDataType GetRelativity(ServiceCall call, PyDecimal preX, PyDecimal preY, PyDecimal preZ,
+                                         PyDecimal presTime, PyDecimal pretTime, PyDecimal prerTime)
+        {
+            int shipID = call.Session.ShipID ?? 0;
+            double x = 0, y = 0, z = 0;
+
+            if (mDestinyManager?.TryGetEntity(shipID, out var bubble) == true)
+            {
+                x = bubble.Position.X;
+                y = bubble.Position.Y;
+                z = bubble.Position.Z;
+            }
+
+            double dx = x - (double)(preX?.Value ?? 0);
+            double dy = y - (double)(preY?.Value ?? 0);
+            double dz = z - (double)(preZ?.Value ?? 0);
+            double diff = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            long now = DateTime.UtcNow.ToFileTimeUtc();
+
+            return new PyTuple(7)
+            {
+                [0] = new PyDecimal(diff),
+                [1] = new PyDecimal(x),
+                [2] = new PyDecimal(y),
+                [3] = new PyDecimal(z),
+                [4] = new PyInteger(now),
+                [5] = new PyInteger(now),
+                [6] = new PyInteger(now)
+            };
+        }
+
         public PyDataType SetSpeedFraction(ServiceCall call, PyDecimal fraction)
         {
             int shipID = call.Session.ShipID ?? 0;
@@ -351,6 +470,9 @@ namespace EVESharp.Node.Services.Space
 
             Log.Information("[beyonce] Dock: char={CharID}, ship={ShipID}, station={StationID}", charID, shipID, targetStation);
 
+            // Unlock all targets when docking
+            TargetMgr?.UnlockAll(charID);
+
             if (targetStation == 0)
                 return new PyNone();
 
@@ -361,8 +483,9 @@ namespace EVESharp.Node.Services.Space
                 return new PyNone();
             }
 
-            // Unregister ship from DestinyManager
+            // Unregister ship from DestinyManager and notify others
             mDestinyManager?.UnregisterEntity(shipID);
+            BroadcastRemoveBalls(shipID);
 
             // Move ship to the new station in DB (same pattern as /move GM command)
             // Use LoadItem to guarantee the ship is loaded even if evicted from cache.
@@ -392,6 +515,19 @@ namespace EVESharp.Node.Services.Space
             );
             Log.Information("[beyonce] Dock: Updated chrInformation for char {CharID}", charID);
 
+            // Send OnDockingAccepted BEFORE session change so client still has a ballpark to animate in
+            double shipX = 0, shipY = 0, shipZ = 0;
+            if (mDestinyManager?.TryGetEntity(shipID, out var dockShipBubble) == true)
+            {
+                shipX = dockShipBubble.Position.X;
+                shipY = dockShipBubble.Position.Y;
+                shipZ = dockShipBubble.Position.Z;
+            }
+            Broadcaster?.BroadcastOnDockingAccepted(charID,
+                shipX, shipY, shipZ,
+                station.X ?? 0, station.Y ?? 0, station.Z ?? 0,
+                targetStation);
+
             // Session change: enter station (reverse of ship.Undock)
             var delta = new Session();
             delta[Session.STATION_ID]       = (PyInteger)targetStation;
@@ -416,6 +552,9 @@ namespace EVESharp.Node.Services.Space
 
             Log.Information("[beyonce] StargateJump: char={CharID}, ship={ShipID}, from={FromID}, to={ToID}", charID, shipID, fromID?.Value, destGateID);
 
+            // Unlock all targets when jumping
+            TargetMgr?.UnlockAll(charID);
+
             if (destGateID == 0)
                 return new PyNone();
 
@@ -431,8 +570,9 @@ namespace EVESharp.Node.Services.Space
                 destInfo.Value.SolarSystemID, destInfo.Value.ConstellationID, destInfo.Value.RegionID,
                 destInfo.Value.X, destInfo.Value.Y, destInfo.Value.Z);
 
-            // Unregister ship from current DestinyManager
+            // Unregister ship from current DestinyManager and notify others
             mDestinyManager?.UnregisterEntity(shipID);
+            BroadcastRemoveBalls(shipID);
 
             // Update ship position to near the destination gate and persist
             // Use LoadItem to guarantee the ship is loaded even if evicted from cache.
@@ -448,6 +588,23 @@ namespace EVESharp.Node.Services.Space
                 Log.Information("[beyonce] StargateJump: Ship {ShipID} persisted at ({X:F0},{Y:F0},{Z:F0}), locationID={LocationID}",
                     shipID, shipEntity.X, shipEntity.Y, shipEntity.Z, destInfo.Value.SolarSystemID);
             }
+
+            // Update chrInformation for login persistence (in space, not docked)
+            Database.Prepare(
+                "UPDATE chrInformation " +
+                "SET stationID = @stationID, solarSystemID = @solarSystemID, " +
+                "    constellationID = @constellationID, regionID = @regionID " +
+                "WHERE characterID = @characterID",
+                new Dictionary<string, object>
+                {
+                    {"@characterID", charID},
+                    {"@stationID", 0},
+                    {"@solarSystemID", destInfo.Value.SolarSystemID},
+                    {"@constellationID", destInfo.Value.ConstellationID},
+                    {"@regionID", destInfo.Value.RegionID}
+                }
+            );
+            Log.Information("[beyonce] StargateJump: Updated chrInformation for char {CharID} -> system {SystemID}", charID, destInfo.Value.SolarSystemID);
 
             // Session change: transition to new solar system
             var delta = new Session();
@@ -510,6 +667,228 @@ namespace EVESharp.Node.Services.Space
         }
 
         // =====================================================================
+        //  SHIP DESTRUCTION / CAPSULE / POD KILL
+        // =====================================================================
+
+        /// <summary>
+        /// CmdSelfDestruct - Called by the client's right-click "Self Destruct" command.
+        /// </summary>
+        public PyDataType CmdSelfDestruct(ServiceCall call, PyInteger shipID)
+        {
+            int charID = call.Session.CharacterID;
+            int currentShipID = call.Session.ShipID ?? 0;
+
+            Log.Information("[beyonce] CmdSelfDestruct: char={CharID}, shipID={ShipID}", charID, shipID?.Value);
+
+            if (currentShipID == 0 || currentShipID != (int)(shipID?.Value ?? 0))
+            {
+                Log.Warning("[beyonce] CmdSelfDestruct: ship mismatch current={Current}, requested={Requested}", currentShipID, shipID?.Value);
+                return new PyNone();
+            }
+
+            DestroyPlayerShip(call);
+            return new PyNone();
+        }
+
+        /// <summary>
+        /// Core ship destruction logic. Destroys the current ship, then either spawns
+        /// a capsule at the same position (ship death) or respawns at clone station (pod kill).
+        /// </summary>
+        internal void DestroyPlayerShip(ServiceCall call)
+        {
+            int charID = call.Session.CharacterID;
+            int shipID = call.Session.ShipID ?? 0;
+
+            if (shipID == 0 || mDestinyManager == null)
+                return;
+
+            // Get ship position before destroying it
+            double posX = 0, posY = 0, posZ = 0;
+            if (mDestinyManager.TryGetEntity(shipID, out BubbleEntity shipBubble))
+            {
+                posX = shipBubble.Position.X;
+                posY = shipBubble.Position.Y;
+                posZ = shipBubble.Position.Z;
+            }
+
+            // Check if ship is a capsule (pod kill) before destroying
+            ItemEntity shipEntity = Items.LoadItem(shipID);
+            bool isCapsule = shipEntity != null && shipEntity.Type.ID == (int)TypeID.Capsule;
+
+            // Send TerminalExplosion so client shows explosion FX before the ball is removed
+            Broadcaster?.BroadcastTerminalExplosion(mSolarSystemID, shipID);
+
+            // Unregister ship from DestinyManager
+            mDestinyManager.UnregisterEntity(shipID);
+
+            // Broadcast RemoveBalls to all players in system
+            BroadcastRemoveBalls(shipID);
+
+            // Remove from ballpark
+            mBallpark?.RemoveEntity(shipID);
+
+            // Destroy the ship item
+            if (shipEntity != null)
+                DogmaItems.DestroyItem(shipEntity);
+
+            Log.Information("[beyonce] DestroyPlayerShip: destroyed ship {ShipID} (isCapsule={IsCapsule}) at ({X:F0},{Y:F0},{Z:F0})",
+                shipID, isCapsule, posX, posY, posZ);
+
+            if (isCapsule)
+                HandlePodKill(call, charID);
+            else
+                HandleShipDeath(call, charID, posX, posY, posZ);
+        }
+
+        /// <summary>
+        /// Ship destroyed in space -> spawn capsule at the same position.
+        /// </summary>
+        private void HandleShipDeath(ServiceCall call, int charID, double posX, double posY, double posZ)
+        {
+            Log.Information("[beyonce] HandleShipDeath: char={CharID}, spawning capsule at ({X:F0},{Y:F0},{Z:F0})", charID, posX, posY, posZ);
+
+            Character character = Items.LoadItem<Character>(charID);
+
+            // Create capsule in the solar system
+            ItemInventory capsule = DogmaItems.CreateItem<ItemInventory>(
+                character.Name + "'s Capsule", Types[TypeID.Capsule], charID, mSolarSystemID, Flags.None, 1, true
+            );
+
+            // Set capsule position to where the ship was destroyed
+            capsule.X = posX;
+            capsule.Y = posY;
+            capsule.Z = posZ;
+            capsule.Persist();
+
+            // Move character into the capsule
+            DogmaItems.MoveItem(character, capsule.ID, Flags.Pilot);
+
+            // Update session to the new capsule ship
+            var delta = new Session { ShipID = capsule.ID };
+            SessionManager.PerformSessionUpdate(Session.CHAR_ID, charID, delta);
+
+            // Register capsule in DestinyManager
+            var capsuleBubble = new BubbleEntity
+            {
+                ItemID        = capsule.ID,
+                TypeID        = (int)TypeID.Capsule,
+                GroupID       = (int)GroupID.Capsule,
+                CategoryID    = (int)CategoryID.Ship,
+                Name          = capsule.Name ?? character.Name + "'s Capsule",
+                OwnerID       = charID,
+                CorporationID = call.Session.CorporationID,
+                AllianceID    = 0,
+                CharacterID   = charID,
+                Position      = new Vector3 { X = posX, Y = posY, Z = posZ },
+                Velocity      = default,
+                Mode          = BallMode.Stop,
+                Flags         = BallFlag.IsFree | BallFlag.IsMassive | BallFlag.IsInteractive,
+                Radius        = 50.0,
+                Mass          = 32000.0,
+                MaxVelocity   = 150.0,
+                SpeedFraction = 0.0,
+                Agility       = 1.0
+            };
+
+            mDestinyManager.RegisterEntity(capsuleBubble);
+
+            // Add capsule to ballpark
+            mBallpark?.AddEntity(capsule);
+
+            // Broadcast AddBalls for the capsule so other players see it
+            int stamp = GetStamp();
+            var addBallEvents = DestinyEventBuilder.BuildAddBalls(new[] { capsuleBubble }, mSolarSystemID, stamp);
+            var notification = DestinyEventBuilder.WrapAsNotification(addBallEvents);
+
+            NotificationSender.SendNotification(
+                "DoDestinyUpdate",
+                "solarsystemid",
+                mSolarSystemID,
+                notification
+            );
+
+            // Send fresh DoDestinyUpdate to the player with new capsule as ego
+            // Build a fresh session with updated ShipID since the session change already happened
+            var freshSession = Session.FromPyDictionary(call.Session);
+            freshSession.ShipID = capsule.ID;
+            SendDoDestinyUpdate(freshSession);
+
+            Log.Information("[beyonce] HandleShipDeath: capsule {CapsuleID} spawned for char {CharID}", capsule.ID, charID);
+        }
+
+        /// <summary>
+        /// Pod killed -> respawn at clone station.
+        /// </summary>
+        private void HandlePodKill(ServiceCall call, int charID)
+        {
+            Log.Information("[beyonce] HandlePodKill: char={CharID}, respawning at clone station", charID);
+
+            Character character = Items.LoadItem<Character>(charID);
+
+            // Find clone station: look up active clone's location, fallback to character's home station
+            int cloneStationID = character.StationID; // fallback
+
+            if (character.ActiveCloneID != null && character.ActiveCloneID.Value != 0)
+            {
+                ItemEntity cloneItem = Items.LoadItem(character.ActiveCloneID.Value);
+                if (cloneItem != null && cloneItem.LocationID != 0)
+                    cloneStationID = cloneItem.LocationID;
+            }
+
+            Log.Information("[beyonce] HandlePodKill: clone station={StationID}", cloneStationID);
+
+            // Look up station details
+            var station = Items.GetStaticStation(cloneStationID);
+            if (station == null)
+            {
+                Log.Error("[beyonce] HandlePodKill: station {StationID} not found, cannot respawn", cloneStationID);
+                return;
+            }
+
+            // Create a new capsule at the clone station
+            ItemInventory capsule = DogmaItems.CreateItem<ItemInventory>(
+                character.Name + "'s Capsule", Types[TypeID.Capsule], charID, cloneStationID, Flags.Hangar, 1, true
+            );
+
+            // Move character into the capsule
+            DogmaItems.MoveItem(character, capsule.ID, Flags.Pilot);
+
+            // Update chrInformation to clone station
+            Database.Prepare(
+                "UPDATE chrInformation " +
+                "SET stationID = @stationID, solarSystemID = @solarSystemID, " +
+                "    constellationID = @constellationID, regionID = @regionID " +
+                "WHERE characterID = @characterID",
+                new Dictionary<string, object>
+                {
+                    {"@characterID", charID},
+                    {"@stationID", cloneStationID},
+                    {"@solarSystemID", station.SolarSystemID},
+                    {"@constellationID", station.ConstellationID},
+                    {"@regionID", station.RegionID}
+                }
+            );
+
+            // Session change: dock at clone station with new capsule
+            var delta = new Session();
+            delta[Session.SHIP_ID]          = (PyInteger)capsule.ID;
+            delta[Session.STATION_ID]       = (PyInteger)cloneStationID;
+            delta[Session.LOCATION_ID]      = (PyInteger)cloneStationID;
+            delta[Session.SOLAR_SYSTEM_ID]  = new PyNone();
+            delta[Session.SOLAR_SYSTEM_ID2] = (PyInteger)station.SolarSystemID;
+            delta[Session.CONSTELLATION_ID] = (PyInteger)station.ConstellationID;
+            delta[Session.REGION_ID]        = (PyInteger)station.RegionID;
+
+            SessionManager.PerformSessionUpdate(Session.CHAR_ID, charID, delta);
+
+            // Clear local ballpark since player is no longer in space
+            mBallpark = null;
+
+            Log.Information("[beyonce] HandlePodKill: char {CharID} respawned at station {StationID} in capsule {CapsuleID}",
+                charID, cloneStationID, capsule.ID);
+        }
+
+        // =====================================================================
         //  DoDestinyUpdate NOTIFICATION
         // =====================================================================
 
@@ -539,14 +918,18 @@ namespace EVESharp.Node.Services.Space
                     [2] = new PyList()        // dogmaMessages
                 };
 
-                // Send via solarsystemid2 broadcast (standard EVE routing)
+                // Send initial SetState ONLY to the specific character, NOT the whole system.
+                // Broadcasting SetState to solarsystemid2 would replace every client's ballpark
+                // in the system with this player's ego/state, causing camera shifts and ship disappearance.
+                // Incremental updates (FollowBall, Stop, etc.) from DestinyManager still broadcast
+                // to the system correctly via DestinyBroadcaster.
                 NotificationSender.SendNotification(
                     "DoDestinyUpdate",
-                    "solarsystemid2",
-                    mSolarSystemID,
+                    "charid",
+                    charID,
                     notificationData
                 );
-                Log.Information("[beyonce] DoDestinyUpdate sent via solarsystemid2 broadcast to system {SystemID}", mSolarSystemID);
+                Log.Information("[beyonce] DoDestinyUpdate sent via charid to character {CharID} in system {SystemID}", charID, mSolarSystemID);
             }
             catch (Exception ex)
             {
@@ -580,6 +963,7 @@ namespace EVESharp.Node.Services.Space
             bagDict["ego"]        = new PyInteger(shipID);
 
             var slims = new PyList();
+            var effectStatesList = new PyList();
 
             // Build slim items for all entities in the ballpark
             foreach (var kvpSlim in mBallpark.Entities)
@@ -587,45 +971,90 @@ namespace EVESharp.Node.Services.Space
                 var ent = kvpSlim.Value;
                 bool isShip = (ent.ID == shipID);
 
+                // Look up BubbleEntity for ownership/state data
+                BubbleEntity bubbleSlim = null;
+                bool hasBubbleSlim = !isShip && mDestinyManager != null
+                    && mDestinyManager.TryGetEntity(ent.ID, out bubbleSlim);
+
                 var slim = BuildSlimItem(
                     ent.ID,
                     ent.Type.ID,
                     ent.Type.Group.ID,
                     ent.Type.Group.Category.ID,
                     ent.Name ?? ent.Type?.Name ?? "Unknown",
-                    isShip ? sess.CharacterID : ent.OwnerID,
+                    isShip ? sess.CharacterID : (hasBubbleSlim ? bubbleSlim.OwnerID : ent.OwnerID),
                     solarSystemID,
-                    isShip ? sess.CorporationID : 0,
-                    0,
-                    isShip ? sess.CharacterID : 0
+                    isShip ? sess.CorporationID : (hasBubbleSlim ? bubbleSlim.CorporationID : 0),
+                    hasBubbleSlim ? bubbleSlim.AllianceID : 0,
+                    isShip ? sess.CharacterID : (hasBubbleSlim ? bubbleSlim.CharacterID : 0)
                 );
 
-                // Ships need a 'modules' field or the client crashes in FitHardpoints2
-                if (isShip)
+                bool isPlayerShip = isShip || (hasBubbleSlim && bubbleSlim.IsPlayer);
+                Log.Information("[beyonce] BuildSnapshot slim: id={EntityID}, isShip={IsShip}, hasBubbleSlim={HasBubble}, bubbleIsPlayer={BubbleIsPlayer}, isPlayerShip={IsPlayerShip}",
+                    ent.ID, isShip, hasBubbleSlim, hasBubbleSlim ? bubbleSlim.IsPlayer : false, isPlayerShip);
+
+                // Player ships need a 'modules' field or the client crashes in FitHardpoints2
+                if (isPlayerShip)
                 {
                     var slimDict = (PyDictionary)slim.Arguments;
                     var modulesList = new PyList();
 
                     // Load the ship to get its fitted modules for 3D hardpoint rendering
+                    // Only include actual ShipModule instances whose type is a real Module category.
+                    // Items with non-module typeIDs (e.g. ore typeID=31) crash FitHardpoints2
+                    // with KeyError on cfg.invtypes.Get() because the client cache only has published types.
                     try
                     {
                         var ship = Items.LoadItem<Ship>(ent.ID);
-                        if (ship != null)
+                        if (ship == null)
                         {
+                            Log.Warning("[beyonce] BuildSnapshot: LoadItem<Ship>({ShipID}) returned NULL", ent.ID);
+                        }
+                        else if (ship.Items == null || ship.Items.Count == 0)
+                        {
+                            Log.Warning("[beyonce] BuildSnapshot: Ship {ShipID} has EMPTY Items collection (ContentsLoaded={ContentsLoaded})",
+                                ent.ID, ship.ContentsLoaded);
+                        }
+                        else
+                        {
+                            Log.Information("[beyonce] BuildSnapshot: Ship {ShipID} has {TotalItems} total items, scanning for modules...",
+                                ent.ID, ship.Items.Count);
+
                             foreach (var (_, module) in ship.Items)
                             {
-                                if (module.IsInModuleSlot() || module.IsInRigSlot())
+                                bool inModuleSlot = module.IsInModuleSlot();
+                                bool inRigSlot = module.IsInRigSlot();
+                                bool isShipModule = module is ShipModule;
+                                bool isModuleCategory = module.Type?.Group?.Category?.ID == (int) CategoryID.Module;
+
+                                if ((inModuleSlot || inRigSlot) && isShipModule && isModuleCategory)
                                 {
+                                    // Client FitHardpoints2 unpacks as (flag, typeID) and calls
+                                    // cfg.invtypes.Get(typeID) on index [1]
                                     var modEntry = new PyTuple(2)
                                     {
-                                        [0] = new PyInteger(module.Type.ID),
-                                        [1] = new PyInteger((int)module.Flag)
+                                        [0] = new PyInteger((int)module.Flag),
+                                        [1] = new PyInteger(module.Type.ID)
                                     };
                                     modulesList.Add(modEntry);
+                                    Log.Information("[beyonce]   Module ADDED: typeID={TypeID}, flag={Flag}, name={Name}",
+                                        module.Type.ID, module.Flag, module.Type?.Name ?? "?");
+
+                                    // NOTE: Passive/online effects are internal stat modifiers and do NOT
+                                    // produce visual effects. They must NOT be added to effectStates because
+                                    // the client dispatches each entry as OnSpecialFX arguments, which expects
+                                    // a completely different format (shipID, moduleID, moduleTypeID, targetID,
+                                    // otherTypeID, area, guid_string, ...). Hardpoint 3D rendering is handled
+                                    // by the modules list (typeID + flag tuples) above.
+                                }
+                                else if (inModuleSlot || inRigSlot)
+                                {
+                                    Log.Information("[beyonce]   Module SKIPPED: typeID={TypeID}, flag={Flag}, isShipModule={IsShipModule}, isModuleCategory={IsModCat}, catID={CatID}",
+                                        module.Type?.ID ?? 0, module.Flag, isShipModule, isModuleCategory, module.Type?.Group?.Category?.ID ?? -1);
                                 }
                             }
 
-                            Log.Information("[beyonce] Ship {ShipID} has {ModuleCount} fitted modules", ent.ID, modulesList.Count);
+                            Log.Information("[beyonce] Ship {ShipID} has {ModuleCount} fitted modules for rendering", ent.ID, modulesList.Count);
                         }
                     }
                     catch (Exception ex)
@@ -652,16 +1081,16 @@ namespace EVESharp.Node.Services.Space
                 }
 
                 slims.Add(slim);
-                Log.Information("[beyonce] Added slim: id={EntityID}, type={TypeName}, isShip={IsShip}", ent.ID, ent.Type?.Name, isShip);
+                Log.Information("[beyonce] Added slim: id={EntityID}, name={EntityName}, type={TypeName}, isShip={IsShip}", ent.ID, ent.Name ?? "(null)", ent.Type?.Name, isShip);
             }
 
             bagDict["slims"] = slims;
 
-            bagDict["damageState"]     = BuildDamageState(shipID, stamp);
-            bagDict["effectStates"]    = new PyList();
+            bagDict["damageState"]     = BuildDamageStateAll(shipID, stamp);
+            bagDict["effectStates"]    = effectStatesList;
             bagDict["allianceBridges"] = new PyList();
 
-            Log.Information("[beyonce] Snapshot: {SlimCount} slims", slims.Count);
+            Log.Information("[beyonce] Snapshot: {SlimCount} slims, effectStates: {EffectCount} entries", slims.Count, effectStatesList.Count);
 
             var bagKeyVal     = new PyObjectData("util.KeyVal", bagDict);
             var stateCallArgs = new PyTuple(1) { [0] = bagKeyVal };
@@ -692,7 +1121,8 @@ namespace EVESharp.Node.Services.Space
                 // If we have a BubbleEntity with live position, use it
                 double x, y, z;
                 BubbleEntity bubbleEnt = null;
-                if (mDestinyManager != null && mDestinyManager.TryGetEntity(ent.ID, out bubbleEnt))
+                bool hasBubble = mDestinyManager != null && mDestinyManager.TryGetEntity(ent.ID, out bubbleEnt);
+                if (hasBubble)
                 {
                     x = bubbleEnt.Position.X;
                     y = bubbleEnt.Position.Y;
@@ -713,6 +1143,12 @@ namespace EVESharp.Node.Services.Space
                     flags = BallFlag.IsFree | BallFlag.IsMassive | BallFlag.IsInteractive;
                     mode  = BallMode.Stop;
                 }
+                else if (hasBubble)
+                {
+                    // Use the BubbleEntity's actual state (works for player ships, NPCs, etc.)
+                    flags = bubbleEnt.Flags;
+                    mode  = bubbleEnt.Mode;
+                }
                 else
                 {
                     flags = BallFlag.IsGlobal | BallFlag.IsMassive | BallFlag.IsInteractive;
@@ -723,8 +1159,7 @@ namespace EVESharp.Node.Services.Space
                 {
                     ItemId   = ent.ID,
                     Mode     = mode,
-                    Radius   = isEgo ? 50.0
-                               : (bubbleEnt?.Radius ?? ent.Type?.Radius ?? 5000.0),
+                    Radius   = bubbleEnt?.Radius ?? ent.Type?.Radius ?? 5000.0,
                     Location = new Vector3 { X = x, Y = y, Z = z },
                     Flags    = flags
                 };
@@ -739,28 +1174,29 @@ namespace EVESharp.Node.Services.Space
                 {
                     ball.ExtraHeader = new ExtraBallHeader
                     {
-                        Mass          = 1000000.0,
+                        Mass          = isEgo ? 1000000.0 : (hasBubble ? bubbleEnt.Mass : 1000000.0),
                         CloakMode     = CloakMode.None,
                         Harmonic      = 0xFFFFFFFFFFFFFFFF,
-                        CorporationId = isEgo ? sess.CorporationID : 0,
-                        AllianceId    = 0
+                        CorporationId = isEgo ? sess.CorporationID : (hasBubble ? bubbleEnt.CorporationID : 0),
+                        AllianceId    = hasBubble ? bubbleEnt.AllianceID : 0
                     };
 
                     if (flags.HasFlag(BallFlag.IsFree))
                     {
                         ball.Data = new BallData
                         {
-                            MaxVelocity   = 200.0,
-                            Velocity      = new Vector3 { X = 0, Y = 0, Z = 0 },
+                            MaxVelocity   = isEgo ? 200.0 : (hasBubble ? bubbleEnt.MaxVelocity : 200.0),
+                            Velocity      = hasBubble ? bubbleEnt.Velocity : default,
                             UnknownVec    = default,
-                            Agility       = 1.0,
-                            SpeedFraction = 0.0
+                            Agility       = hasBubble ? bubbleEnt.Agility : 1.0,
+                            SpeedFraction = hasBubble ? bubbleEnt.SpeedFraction : 0.0
                         };
                     }
                 }
 
                 balls.Add(ball);
-                Log.Information("[beyonce] Ball: id={BallID}, ego={IsEgo}, mode={Mode}, flags={Flags}, pos=({X:F0},{Y:F0},{Z:F0})", ent.ID, isEgo, mode, flags, x, y, z);
+                Log.Information("[beyonce] Ball: id={BallID}, ego={IsEgo}, hasBubble={HasBubble}, mode={Mode}, flags={Flags}, pos=({X:F0},{Y:F0},{Z:F0})",
+                    ent.ID, isEgo, hasBubble, mode, flags, x, y, z);
             }
 
             byte[] result = DestinyBinaryEncoder.BuildFullState(balls, stamp, 0);
@@ -796,7 +1232,7 @@ namespace EVESharp.Node.Services.Space
                 mode  = BallMode.Rigid;
             }
 
-            return new BubbleEntity
+            var bubble = new BubbleEntity
             {
                 ItemID        = entity.ID,
                 TypeID        = entity.Type?.ID ?? 0,
@@ -817,6 +1253,178 @@ namespace EVESharp.Node.Services.Space
                 SpeedFraction = 0.0,
                 Agility       = 1.0
             };
+
+            // Load HP, resistances, and signature radius from item attributes
+            if (isPlayerShip && entity.Attributes != null)
+            {
+                var attrs = entity.Attributes;
+
+                // Shield
+                if (attrs.AttributeExists(AttributeTypes.shieldCapacity))
+                {
+                    bubble.ShieldCapacity = (double) attrs[AttributeTypes.shieldCapacity];
+                    // shieldCharge defaults to full if not set (dogmaIM.ShipGetInfo initializes it)
+                    bubble.ShieldCharge = attrs.AttributeExists(AttributeTypes.shieldCharge)
+                        ? (double) attrs[AttributeTypes.shieldCharge]
+                        : bubble.ShieldCapacity;
+                }
+
+                // Armor
+                if (attrs.AttributeExists(AttributeTypes.armorHP))
+                    bubble.ArmorHP = (double) attrs[AttributeTypes.armorHP];
+                if (attrs.AttributeExists(AttributeTypes.armorDamage))
+                    bubble.ArmorDamage = (double) attrs[AttributeTypes.armorDamage];
+
+                // Structure (hull) — attribute "hp"
+                if (attrs.AttributeExists(AttributeTypes.hp))
+                    bubble.StructureHP = (double) attrs[AttributeTypes.hp];
+
+                // Shield resistances
+                if (attrs.AttributeExists(AttributeTypes.shieldEmDamageResonance))
+                    bubble.ShieldEmResonance = (double) attrs[AttributeTypes.shieldEmDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.shieldExplosiveDamageResonance))
+                    bubble.ShieldExplosiveResonance = (double) attrs[AttributeTypes.shieldExplosiveDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.shieldKineticDamageResonance))
+                    bubble.ShieldKineticResonance = (double) attrs[AttributeTypes.shieldKineticDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.shieldThermalDamageResonance))
+                    bubble.ShieldThermalResonance = (double) attrs[AttributeTypes.shieldThermalDamageResonance];
+
+                // Armor resistances
+                if (attrs.AttributeExists(AttributeTypes.armorEmDamageResonance))
+                    bubble.ArmorEmResonance = (double) attrs[AttributeTypes.armorEmDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.armorExplosiveDamageResonance))
+                    bubble.ArmorExplosiveResonance = (double) attrs[AttributeTypes.armorExplosiveDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.armorKineticDamageResonance))
+                    bubble.ArmorKineticResonance = (double) attrs[AttributeTypes.armorKineticDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.armorThermalDamageResonance))
+                    bubble.ArmorThermalResonance = (double) attrs[AttributeTypes.armorThermalDamageResonance];
+
+                // Hull resistances
+                if (attrs.AttributeExists(AttributeTypes.hullEmDamageResonance))
+                    bubble.HullEmResonance = (double) attrs[AttributeTypes.hullEmDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.hullExplosiveDamageResonance))
+                    bubble.HullExplosiveResonance = (double) attrs[AttributeTypes.hullExplosiveDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.hullKineticDamageResonance))
+                    bubble.HullKineticResonance = (double) attrs[AttributeTypes.hullKineticDamageResonance];
+                if (attrs.AttributeExists(AttributeTypes.hullThermalDamageResonance))
+                    bubble.HullThermalResonance = (double) attrs[AttributeTypes.hullThermalDamageResonance];
+
+                // Signature radius
+                if (attrs.AttributeExists(AttributeTypes.signatureRadius))
+                    bubble.SignatureRadius = (double) attrs[AttributeTypes.signatureRadius];
+
+                // Movement attributes
+                if (attrs.AttributeExists(AttributeTypes.maxVelocity))
+                    bubble.MaxVelocity = (double) attrs[AttributeTypes.maxVelocity];
+                if (attrs.AttributeExists(AttributeTypes.mass))
+                    bubble.Mass = (double) attrs[AttributeTypes.mass];
+                if (attrs.AttributeExists(AttributeTypes.agility))
+                    bubble.Agility = (double) attrs[AttributeTypes.agility];
+                if (attrs.AttributeExists(AttributeTypes.radius))
+                    bubble.Radius = (double) attrs[AttributeTypes.radius];
+            }
+
+            return bubble;
+        }
+
+        private void BroadcastRemoveBalls(int shipID)
+        {
+            if (shipID == 0) return;
+
+            var events = DestinyEventBuilder.BuildRemoveBalls(new[] { shipID });
+            var notification = DestinyEventBuilder.WrapAsNotification(events);
+
+            NotificationSender.SendNotification(
+                "DoDestinyUpdate",
+                "solarsystemid",
+                mSolarSystemID,
+                notification
+            );
+
+            Log.Information("[beyonce] Broadcast RemoveBalls for ship {ShipID} in system {SystemID}", shipID, mSolarSystemID);
+        }
+
+        private static int GetStamp()
+        {
+            long eveEpoch = new DateTime(2003, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+            return (int)((DateTime.UtcNow.Ticks - eveEpoch) / 10000000 % int.MaxValue);
+        }
+
+        /// <summary>
+        /// Patches the slim entries inside an AddBalls event list to include 'modules'.
+        /// The DestinyEventBuilder.BuildAddBalls doesn't know about modules, so we add them here.
+        /// </summary>
+        private void AddModulesToAddBallSlims(PyList events, int shipID)
+        {
+            try
+            {
+                Log.Information("[beyonce] AddModulesToAddBallSlims: looking for shipID={ShipID} in AddBalls slims", shipID);
+
+                // events = [(stamp, ("AddBalls", (state, slims, damageDict)))]
+                if (events.Count == 0) return;
+
+                var eventTuple = events[0] as PyTuple;
+                if (eventTuple == null || eventTuple.Count < 2) return;
+
+                var innerCall = eventTuple[1] as PyTuple;
+                if (innerCall == null || innerCall.Count < 2) return;
+
+                var args = innerCall[1] as PyTuple;
+                if (args == null || args.Count < 2) return;
+
+                var slimsList = args[1] as PyList;
+                if (slimsList == null) return;
+
+                bool foundShip = false;
+                foreach (PyObjectData slimObj in slimsList.GetEnumerable<PyObjectData>())
+                {
+                    var slimDict = slimObj.Arguments as PyDictionary;
+                    if (slimDict == null) continue;
+
+                    if (slimDict.TryGetValue("itemID", out PyDataType idVal) && idVal is PyInteger itemId && itemId.Value == shipID)
+                    {
+                        foundShip = true;
+                        var modulesList = new PyList();
+
+                        var ship = Items.LoadItem<Ship>(shipID);
+                        if (ship == null)
+                        {
+                            Log.Warning("[beyonce] AddModulesToAddBallSlims: LoadItem<Ship>({ShipID}) returned NULL", shipID);
+                        }
+                        else if (ship.Items == null || ship.Items.Count == 0)
+                        {
+                            Log.Warning("[beyonce] AddModulesToAddBallSlims: Ship {ShipID} has EMPTY Items (ContentsLoaded={ContentsLoaded})",
+                                shipID, ship.ContentsLoaded);
+                        }
+                        else
+                        {
+                            foreach (var (_, module) in ship.Items)
+                            {
+                                if ((module.IsInModuleSlot() || module.IsInRigSlot()) && module is ShipModule
+                                    && module.Type?.Group?.Category?.ID == (int) CategoryID.Module)
+                                {
+                                    // Client FitHardpoints2 unpacks as (flag, typeID)
+                                    modulesList.Add(new PyTuple(2)
+                                    {
+                                        [0] = new PyInteger((int)module.Flag),
+                                        [1] = new PyInteger(module.Type.ID)
+                                    });
+                                }
+                            }
+                        }
+
+                        slimDict["modules"] = modulesList;
+                        Log.Information("[beyonce] AddModulesToAddBallSlims: ship {ShipID} -> {ModuleCount} modules added to AddBalls slim", shipID, modulesList.Count);
+                    }
+                }
+
+                if (!foundShip)
+                    Log.Warning("[beyonce] AddModulesToAddBallSlims: ship {ShipID} NOT FOUND in slims list", shipID);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[beyonce] Failed to add modules to AddBalls slims: {Message}", ex.Message);
+            }
         }
 
         // Groups that represent celestial objects visible in the overview
@@ -1018,7 +1626,8 @@ namespace EVESharp.Node.Services.Space
                 ["jumps"]           = new PyList(),
                 ["securityStatus"]  = new PyDecimal(0.0),
                 ["orbitalVelocity"] = new PyDecimal(0.0),
-                ["warFactionID"]    = new PyNone()
+                ["warFactionID"]    = new PyNone(),
+                ["bounty"]          = new PyDecimal(0.0)
             };
 
             return new PyObjectData("util.KeyVal", d);
@@ -1044,10 +1653,62 @@ namespace EVESharp.Node.Services.Space
                 ["jumps"]           = new PyList(),
                 ["securityStatus"]  = new PyDecimal(0.0),
                 ["orbitalVelocity"] = new PyDecimal(0.0),
-                ["warFactionID"]    = new PyNone()
+                ["warFactionID"]    = new PyNone(),
+                ["bounty"]          = new PyDecimal(0.0)
             };
 
             return new PyObjectData("util.KeyVal", d);
+        }
+
+        /// <summary>
+        /// Build damage state for the ego ship plus all IsFree entities (player ships, NPCs, etc.).
+        /// Without a damage state entry, the client crashes when inspecting the entity.
+        /// </summary>
+        private PyDictionary BuildDamageStateAll(int egoShipID, int stamp)
+        {
+            var dict = new PyDictionary();
+
+            // Add ego ship
+            if (egoShipID != 0)
+            {
+                BubbleEntity egoBubble = null;
+                mDestinyManager?.TryGetEntity(egoShipID, out egoBubble);
+                dict[new PyInteger(egoShipID)] = MakeDamageEntry(stamp, egoBubble);
+            }
+
+            // Add all IsFree entities (player ships, spawned NPCs, etc.)
+            if (mDestinyManager != null)
+            {
+                foreach (var ent in mDestinyManager.GetEntities())
+                {
+                    if (ent.ItemID != egoShipID && ent.Flags.HasFlag(BallFlag.IsFree))
+                        dict[new PyInteger(ent.ItemID)] = MakeDamageEntry(stamp, ent);
+                }
+            }
+
+            return dict;
+        }
+
+        internal static PyTuple MakeDamageEntry(int stamp, BubbleEntity entity = null)
+        {
+            double shield = entity?.ShieldFraction ?? 1.0;
+            double armor  = entity?.ArmorFraction  ?? 1.0;
+            double hull   = entity?.HullFraction   ?? 1.0;
+
+            // Client expects: ((shieldFrac, tau), armorFrac, hullFrac)
+            // tau = shield recharge time constant; 1e20 = effectively no passive regen
+            var shieldTuple = new PyTuple(2)
+            {
+                [0] = new PyDecimal(shield),
+                [1] = new PyDecimal(1e20)
+            };
+
+            return new PyTuple(3)
+            {
+                [0] = shieldTuple,
+                [1] = new PyDecimal(armor),
+                [2] = new PyDecimal(hull)
+            };
         }
 
         private static PyDictionary BuildDamageState(int shipID, int stamp)
@@ -1055,19 +1716,18 @@ namespace EVESharp.Node.Services.Space
             if (shipID == 0)
                 return new PyDictionary();
 
-            // {shipID: ((shieldFraction, armorFraction, hullFraction), timestamp, isRepairing)}
-            var hpTuple = new PyTuple(3)
+            // Client expects: ((shieldFrac, tau), armorFrac, hullFrac)
+            var shieldTuple = new PyTuple(2)
             {
-                [0] = new PyDecimal(1.0),  // shield
-                [1] = new PyDecimal(1.0),  // armor
-                [2] = new PyDecimal(1.0)   // hull
+                [0] = new PyDecimal(1.0),
+                [1] = new PyDecimal(1e20)
             };
 
             var entry = new PyTuple(3)
             {
-                [0] = hpTuple,
-                [1] = new PyInteger(stamp),
-                [2] = new PyBool(false)
+                [0] = shieldTuple,
+                [1] = new PyDecimal(1.0),  // armor
+                [2] = new PyDecimal(1.0)   // hull
             };
 
             return new PyDictionary
@@ -1100,13 +1760,82 @@ namespace EVESharp.Node.Services.Space
 
         protected override void OnClientDisconnected()
         {
-            Log.Information("[beyonce] Client disconnected");
-            // Unregister ship from destiny when client disconnects
+            Log.Information("[beyonce] Client disconnected, char={CharID}", mOwnerID);
+
+            // Unlock all targets on disconnect
+            TargetMgr?.UnlockAll(mOwnerID);
+
+            if (mBallpark == null || mDestinyManager == null)
+                return;
+
+            // Find the player's ship in the DestinyManager
             int shipID = 0;
-            if (mBallpark != null)
+            foreach (var ent in mDestinyManager.GetEntities())
             {
-                mDestinyManager?.UnregisterEntity(shipID);
+                if (ent.CharacterID == mOwnerID)
+                {
+                    shipID = ent.ItemID;
+                    break;
+                }
             }
+
+            if (shipID == 0)
+                return;
+
+            // Persist ship position and chrInformation before cleanup
+            try
+            {
+                if (mDestinyManager.TryGetEntity(shipID, out BubbleEntity shipBubble))
+                {
+                    ItemEntity shipEntity = Items.LoadItem(shipID);
+                    if (shipEntity != null)
+                    {
+                        shipEntity.X = shipBubble.Position.X;
+                        shipEntity.Y = shipBubble.Position.Y;
+                        shipEntity.Z = shipBubble.Position.Z;
+                        shipEntity.Persist();
+                        Log.Information("[beyonce] Disconnect: Persisted ship {ShipID} at ({X:F0},{Y:F0},{Z:F0})",
+                            shipID, shipEntity.X, shipEntity.Y, shipEntity.Z);
+                    }
+                }
+
+                var solarSystem = Items.GetStaticSolarSystem(mSolarSystemID);
+                Database.Prepare(
+                    "UPDATE chrInformation " +
+                    "SET stationID = @stationID, solarSystemID = @solarSystemID, " +
+                    "    constellationID = @constellationID, regionID = @regionID " +
+                    "WHERE characterID = @characterID",
+                    new Dictionary<string, object>
+                    {
+                        {"@characterID", mOwnerID},
+                        {"@stationID", 0},
+                        {"@solarSystemID", mSolarSystemID},
+                        {"@constellationID", solarSystem.ConstellationId},
+                        {"@regionID", solarSystem.RegionId}
+                    }
+                );
+                Log.Information("[beyonce] Disconnect: Updated chrInformation for char {CharID} in system {SystemID}", mOwnerID, mSolarSystemID);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[beyonce] Disconnect: Failed to persist position for ship {ShipID}, char {CharID}", shipID, mOwnerID);
+            }
+
+            Log.Information("[beyonce] Unregistering ship {ShipID} and broadcasting RemoveBalls", shipID);
+
+            // Unregister from DestinyManager
+            mDestinyManager.UnregisterEntity(shipID);
+
+            // Broadcast RemoveBalls to other players in the system
+            var events = DestinyEventBuilder.BuildRemoveBalls(new[] { shipID });
+            var notification = DestinyEventBuilder.WrapAsNotification(events);
+
+            NotificationSender.SendNotification(
+                "DoDestinyUpdate",
+                "solarsystemid",
+                mSolarSystemID,
+                notification
+            );
         }
     }
 }
